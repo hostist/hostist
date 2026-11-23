@@ -15,7 +15,14 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("ABYSS_SECRET", "replace-this-with-a-long-random-secret")
-app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
+# Keep users signed in across browser restarts. The signing key must remain stable
+# between deployments (Render's generated ABYSS_SECRET provides that).
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
+app.config["SESSION_REFRESH_EACH_REQUEST"] = True
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("COOKIE_SECURE", "0") == "1"
 # Cache versioned static assets so repeat visits do not redownload CSS.
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = timedelta(days=30)
 app.config["UPLOAD_FOLDER"] = UPLOAD_DIR
@@ -98,6 +105,10 @@ def init_db():
             c.execute("ALTER TABLE users ADD COLUMN date_of_birth TEXT")
         if "pronouns" not in columns:
             c.execute("ALTER TABLE users ADD COLUMN pronouns TEXT DEFAULT ''")
+        if "banner" not in columns:
+            c.execute("ALTER TABLE users ADD COLUMN banner TEXT DEFAULT ''")
+        if "custom_status" not in columns:
+            c.execute("ALTER TABLE users ADD COLUMN custom_status TEXT DEFAULT ''")
         # Enforce case-insensitive username and email uniqueness.
         try:
             c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_nocase ON users(username COLLATE NOCASE)")
@@ -212,6 +223,7 @@ def register():
                             )
                             session.clear()
                             session["uid"], session["username"] = uid, username
+                            session.permanent = True
                             return redirect(url_for("app_home"))
                 except sqlite3.IntegrityError:
                     flash("That username or email is already registered. Please choose another.")
@@ -225,7 +237,13 @@ def login():
         with connect() as c:
             u = c.execute("SELECT * FROM users WHERE username = ? COLLATE NOCASE", (username,)).fetchone()
             if u and check_password_hash(u["password_hash"],password):
+                # Flask only issues a browser-persistent cookie when the session is
+                # explicitly marked permanent. Registration already did this, but the
+                # login route previously omitted it, so returning users were signed
+                # out when they closed the browser/app.
+                session.clear()
                 session["uid"], session["username"] = u["id"],u["username"]
+                session.permanent = True
                 c.execute("UPDATE users SET status='online' WHERE id=?",(u["id"],))
                 return redirect(url_for("app_home"))
         flash("Incorrect username or password.")
@@ -248,12 +266,12 @@ def uploaded_file(filename):
 def public_profile(user_id):
     uid = session["uid"]
     with connect() as c:
-        user = c.execute("SELECT id,username,display_name,pronouns,avatar,bio,status,created_at FROM users WHERE id=?", (user_id,)).fetchone()
+        user = c.execute("SELECT id,username,display_name,pronouns,avatar,banner,custom_status,bio,status,created_at FROM users WHERE id=?", (user_id,)).fetchone()
         if not user:
             abort(404)
         relation = c.execute("SELECT requester_id,addressee_id,status FROM friendships WHERE (requester_id=? AND addressee_id=?) OR (requester_id=? AND addressee_id=?)", (uid,user_id,user_id,uid)).fetchone() if uid != user_id else None
         mutual_servers = c.execute("SELECT COUNT(*) FROM memberships mine JOIN memberships theirs ON theirs.server_id=mine.server_id WHERE mine.user_id=? AND theirs.user_id=?", (uid,user_id)).fetchone()[0]
-        return jsonify({"id": user["id"], "username": user["username"], "display_name": user["display_name"] or user["username"], "pronouns": user["pronouns"] or "", "avatar": url_for("uploaded_file", filename=user["avatar"]) if user["avatar"] else "", "bio": user["bio"] or "", "status": user["status"] or "offline", "created_at": user["created_at"], "is_self": uid == user_id, "friend_status": relation["status"] if relation else "none", "friend_request_incoming": bool(relation and relation["requester_id"] == user_id and relation["status"] == "pending"), "mutual_servers": mutual_servers})
+        return jsonify({"id": user["id"], "username": user["username"], "display_name": user["display_name"] or user["username"], "pronouns": user["pronouns"] or "", "avatar": url_for("uploaded_file", filename=user["avatar"]) if user["avatar"] else "", "banner": url_for("uploaded_file", filename=user["banner"]) if user["banner"] else "", "custom_status": user["custom_status"] or "", "bio": user["bio"] or "", "status": user["status"] or "offline", "created_at": user["created_at"], "is_self": uid == user_id, "friend_status": relation["status"] if relation else "none", "friend_request_incoming": bool(relation and relation["requester_id"] == user_id and relation["status"] == "pending"), "mutual_servers": mutual_servers})
 
 @app.route("/app")
 @require_auth
@@ -329,7 +347,7 @@ def app_home():
         # primary key here so the signed-in user's own profile button has a
         # real user ID instead of generating a request for /api/users/None.
         own_profile = c.execute(
-            "SELECT id,username,display_name,bio,pronouns,avatar FROM users WHERE id=?",
+            "SELECT id,username,display_name,bio,pronouns,avatar,banner,custom_status FROM users WHERE id=?",
             (uid,)
         ).fetchone()
 
@@ -479,32 +497,36 @@ def profile():
     display_name=request.form.get("display_name", "").strip()[:32]
     username=request.form.get("username", "").strip()
     pronouns=request.form.get("pronouns", "").strip()[:30]
+    custom_status=request.form.get("custom_status", "").strip()[:80]
     if not display_name:
         display_name = username
-    if len(display_name) > 32:
-        flash("Display name must be 32 characters or fewer.")
-        return redirect(url_for("app_home"))
     if not re.fullmatch(r"[A-Za-z0-9_]{3,20}", username):
         flash("Username must be 3–20 characters using letters, numbers, or underscores.")
         return redirect(url_for("app_home"))
-    avatar=session.get("avatar", "")
-    file=request.files.get("avatar")
-    if file and file.filename:
-        ext=os.path.splitext(secure_filename(file.filename))[1].lower()
-        if ext not in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
-            flash("Avatar must be PNG, JPG, GIF, or WEBP.")
-            return redirect(url_for("app_home"))
-        filename=f"user_{session['uid']}_{secrets.token_hex(5)}{ext}"
-        file.save(os.path.join(UPLOAD_DIR, filename))
-        avatar=filename
+    with connect() as c:
+        current=c.execute("SELECT avatar,banner FROM users WHERE id=?",(session["uid"],)).fetchone()
+    avatar=current["avatar"] or ""
+    banner=current["banner"] or ""
+    for field, key in (("avatar","avatar"),("banner","banner")):
+        file=request.files.get(field)
+        if file and file.filename:
+            ext=os.path.splitext(secure_filename(file.filename))[1].lower()
+            if ext not in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
+                flash(f"{field.title()} must be PNG, JPG, GIF, or WEBP.")
+                return redirect(url_for("app_home"))
+            filename=f"user_{session['uid']}_{field}_{secrets.token_hex(5)}{ext}"
+            file.save(os.path.join(UPLOAD_DIR, filename))
+            if key == "avatar": avatar=filename
+            else: banner=filename
     with connect() as c:
         taken=c.execute("SELECT id FROM users WHERE username=? COLLATE NOCASE AND id<>?", (username, session["uid"])).fetchone()
         if taken:
             flash("That username is already taken. Choose another one.")
             return redirect(url_for("app_home"))
-        c.execute("UPDATE users SET username=?,display_name=?,pronouns=?,bio=?,avatar=? WHERE id=?",
-                  (username, display_name, pronouns, bio, avatar, session["uid"]))
+        c.execute("UPDATE users SET username=?,display_name=?,pronouns=?,bio=?,avatar=?,banner=?,custom_status=? WHERE id=?",
+                  (username, display_name, pronouns, bio, avatar, banner, custom_status, session["uid"]))
     session["username"] = username
+    session.permanent = True
     flash("Profile updated.")
     return redirect(url_for("app_home"))
 

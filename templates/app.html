@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HOSTIST</title>
-<link rel="stylesheet" href="{{url_for('static',filename='style.css',v='20261124-profile-avatar-fix1')}}">
+<link rel="stylesheet" href="{{url_for('static',filename='style.css',v='20261124-profile-banner-status-fix2')}}">
 </head>
 <body class="layout">
 <aside class="guild-rail">
@@ -52,12 +52,12 @@
   {% endif %}
 {% endif %}
 <div class="account-menu" id="account-menu" hidden>
-  <div class="profile-popover-cover"></div>
+  <div class="profile-popover-cover" {% if own_profile.banner %}style="background-image:url('{{url_for('uploaded_file',filename=own_profile.banner)}}')"{% endif %}></div>
   <div class="profile-popover-user profile-open" data-user-id="{{own_profile.id}}" role="button" tabindex="0" aria-label="View your profile">
     <span class="user-avatar">{% if own_profile.avatar %}<img src="{{url_for('uploaded_file',filename=own_profile.avatar)}}" alt="">{% else %}{{(own_profile.display_name or username)[:1]|upper}}{% endif %}</span>
     <div class="profile-popover-identity"><b>{{own_profile.display_name or username}}</b><div class="profile-popover-handle-row"><small>@{{username}}</small>{% if own_profile.pronouns %}<small class="profile-popover-pronouns">{{own_profile.pronouns}}</small>{% endif %}</div></div>
   </div>
-  <div class="profile-popover-bio">{{own_profile.bio or 'Welcome to HOSTIST.'}}</div>
+  <div class="profile-popover-bio">{% if own_profile.custom_status %}<span class="profile-custom-status">{{own_profile.custom_status}}</span>{% endif %}{{own_profile.bio or 'Welcome to HOSTIST.'}}</div>
   <div class="account-menu-heading">ACCOUNT</div>
   <button class="account-menu-item" type="button" onclick="openPublicProfile({{own_profile.id}});document.getElementById('account-menu').hidden=true">◎ <span>View my profile</span></button>
   <button class="account-menu-item" type="button" onclick="showSavedAccounts()">⇄ <span>Switch account</span><span class="menu-chevron">›</span></button>
@@ -126,15 +126,18 @@
 <section class="settings-pane" data-settings-pane="profile"><div class="settings-page-heading"><span>USER SETTINGS</span><h1>Profiles</h1><p>Personalize how your profile looks to everyone on HOSTIST.</p></div>
 <div class="settings-section-heading"><h2>Profile picture</h2><p>Choose an image that represents you.</p></div>
 <div class="settings-avatar-editor"><div class="settings-avatar-preview" id="settings-avatar-preview">{% if own_profile.avatar %}<img src="{{url_for('uploaded_file',filename=own_profile.avatar)}}" alt="Current profile picture">{% else %}{{(own_profile.display_name or username)[:1]|upper}}{% endif %}</div><div class="settings-avatar-actions"><b>PROFILE AVATAR</b><span>PNG, JPG, GIF, or WEBP</span><label class="settings-upload-button" for="settings-avatar-input">Change avatar</label><input id="settings-avatar-input" type="file" name="avatar" accept="image/png,image/jpeg,image/gif,image/webp"></div></div>
+<div class="settings-section-heading"><h2>Profile banner</h2><p>Add a wide image at the top of your profile.</p></div>
+<div class="settings-banner-editor">{% if own_profile.banner %}<img src="{{url_for('uploaded_file',filename=own_profile.banner)}}" alt="Current profile banner" id="settings-banner-preview">{% else %}<div id="settings-banner-preview" class="settings-banner-empty">No banner selected</div>{% endif %}<label class="settings-upload-button" for="settings-banner-input">Upload banner</label><input id="settings-banner-input" type="file" name="banner" accept="image/png,image/jpeg,image/gif,image/webp"></div>
 <div class="settings-section-heading"><h2>Profile details</h2><p>Share a little more about yourself.</p></div>
+<label class="settings-field"><span>CUSTOM STATUS</span><input name="custom_status" maxlength="80" value="{{own_profile.custom_status or ''}}" placeholder="What are you up to?"><small>Shown on your profile and account menu. Maximum 80 characters.</small></label>
 <label class="settings-field"><span>PRONOUNS</span><input name="pronouns" maxlength="30" value="{{own_profile.pronouns or ''}}" placeholder="e.g. they/them"><small>Let people know which pronouns to use.</small></label>
 <label class="settings-field"><span>ABOUT ME</span><textarea name="bio" maxlength="160" placeholder="Tell people a little about yourself..." rows="4">{{own_profile.bio or ''}}</textarea><small class="settings-char-count"><span id="bio-count">{{(own_profile.bio or '')|length}}</span>/160 characters</small></label></section>
 </div><footer class="settings-footer"><span>Changes won't be saved until you select Save Changes.</span><div><button type="button" class="settings-cancel" onclick="document.getElementById('profile-modal').close()">Cancel</button><button type="submit" class="settings-save">Save Changes</button></div></footer></section></form></dialog>
 <dialog id="public-profile-modal" class="public-profile-modal">
 <button type="button" class="profile-close" onclick="document.getElementById('public-profile-modal').close()" aria-label="Close">×</button>
-<div class="public-profile-cover"></div><div class="public-profile-body">
+<div class="public-profile-cover" id="public-profile-cover"></div><div class="public-profile-body">
 <div class="public-profile-avatar-wrap"><div class="public-profile-avatar" id="public-profile-avatar">?</div><span class="public-profile-presence" id="public-profile-presence"></span></div>
-<div class="public-profile-title"><h2 id="public-profile-name">Profile</h2><div class="public-profile-handle-row"><span id="public-profile-handle"></span><span class="public-profile-pronouns" id="public-profile-pronouns"></span></div></div>
+<div class="public-profile-title"><h2 id="public-profile-name">Profile</h2><p class="public-profile-custom-status" id="public-profile-status"></p><div class="public-profile-handle-row"><span id="public-profile-handle"></span><span class="public-profile-pronouns" id="public-profile-pronouns"></span></div></div>
 <div class="public-profile-actions" id="public-profile-actions"></div>
 <section class="public-profile-bio-section"><h3>Bio</h3><p class="public-profile-bio" id="public-profile-bio"></p></section>
 <section class="public-profile-member-section"><h3>Member Since</h3><p id="public-profile-meta"></p></section>
@@ -150,6 +153,8 @@ function setSettingsTab(tab){document.querySelectorAll('[data-settings-tab]').fo
 document.querySelectorAll('[data-settings-tab]').forEach(b=>b.addEventListener('click',()=>setSettingsTab(b.dataset.settingsTab)));
 const avatarInput=document.getElementById('settings-avatar-input');
 if(avatarInput)avatarInput.addEventListener('change',()=>{const file=avatarInput.files&&avatarInput.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{const preview=document.getElementById('settings-avatar-preview');preview.innerHTML='';const img=document.createElement('img');img.src=reader.result;img.alt='New profile picture preview';preview.append(img)};reader.readAsDataURL(file)});
+const bannerInput=document.getElementById('settings-banner-input');
+if(bannerInput)bannerInput.addEventListener('change',()=>{const file=bannerInput.files&&bannerInput.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{const old=document.getElementById('settings-banner-preview');const img=document.createElement('img');img.id='settings-banner-preview';img.src=reader.result;img.alt='New banner preview';old.replaceWith(img)};reader.readAsDataURL(file)});
 const bioInput=document.querySelector('#profile-settings-form textarea[name="bio"]');
 if(bioInput)bioInput.addEventListener('input',()=>{document.getElementById('bio-count').textContent=bioInput.value.length});
 function toggleServerMenu(force){const menu=document.getElementById('server-plus-menu');const btn=document.querySelector('.server-plus-wrap>.guild.add');const open=typeof force==='boolean'?force:menu.hidden;menu.hidden=!open;if(btn)btn.setAttribute('aria-expanded',String(open));}
@@ -203,6 +208,8 @@ async function openPublicProfile(id){
     document.getElementById('public-profile-name').textContent=u.display_name||u.username;
     document.getElementById('public-profile-handle').textContent='@'+u.username;
     document.getElementById('public-profile-pronouns').textContent=u.pronouns||'';
+    const cover=document.getElementById('public-profile-cover');cover.style.backgroundImage=u.banner ? ('url(' + JSON.stringify(u.banner) + ')') : '';
+    document.getElementById('public-profile-status').textContent=u.custom_status||'';
     document.getElementById('public-profile-presence').className='public-profile-presence '+(u.status==='online'?'is-online':'is-offline');
     document.getElementById('public-profile-bio').textContent=u.bio||'No bio yet.';
     const created=u.created_at?new Date(String(u.created_at).replace(' ','T')+'Z'):null;

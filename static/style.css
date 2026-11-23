@@ -506,3 +506,12 @@ body.layout,.layout,.conversation{background:#000;color:#f3f3f3}
 #account-menu .profile-popover-user > .user-avatar > img { position:absolute!important; inset:0!important; display:block!important; width:100%!important; height:100%!important; min-width:0!important; min-height:0!important; max-width:100%!important; max-height:100%!important; object-fit:cover!important; border-radius:50%!important; }
 .user-bar .account-trigger > .user-avatar { display:block!important; position:relative!important; flex:0 0 34px!important; width:34px!important; height:34px!important; min-width:34px!important; min-height:34px!important; max-width:34px!important; max-height:34px!important; overflow:hidden!important; border-radius:50%!important; }
 .user-bar .account-trigger > .user-avatar > img { position:absolute!important; inset:0!important; display:block!important; width:100%!important; height:100%!important; min-width:0!important; min-height:0!important; max-width:100%!important; max-height:100%!important; object-fit:cover!important; border-radius:50%!important; }
+
+/* Custom profile banner and status */
+.profile-popover-cover{background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important}
+.public-profile-cover{background-size:cover;background-position:center;background-repeat:no-repeat}
+.profile-custom-status{display:block;color:#e7e7e7;font-size:12px;margin-bottom:6px;font-weight:600}
+.public-profile-custom-status{margin:4px 0 0;color:#bdbdc6;font-size:12px;overflow-wrap:anywhere}
+.settings-banner-editor{display:flex;flex-direction:column;align-items:flex-start;gap:9px;padding:12px;background:#232429;border-radius:8px}
+.settings-banner-editor img,.settings-banner-empty{width:100%;height:100px;object-fit:cover;border-radius:5px;background:#15151a;display:grid;place-items:center;color:#999;font-size:12px}
+#settings-banner-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
