@@ -518,3 +518,108 @@ body.layout,.layout,.conversation{background:#000;color:#f3f3f3}
 .settings-banner-editor{display:flex;flex-direction:column;align-items:flex-start;gap:9px;padding:12px;background:#232429;border-radius:8px}
 .settings-banner-editor img,.settings-banner-empty{width:100%;height:100px;object-fit:cover;border-radius:5px;background:#15151a;display:grid;place-items:center;color:#999;font-size:12px}
 #settings-banner-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+
+/* Reliable account settings scrolling and persistent save controls. */
+.account-settings-dialog {
+  box-sizing: border-box;
+  height: min(720px, calc(100dvh - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+}
+.account-settings-dialog > form {
+  display: grid;
+  grid-template-columns: 218px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.account-settings-dialog > form > .settings-sidebar,
+.account-settings-dialog > form > .settings-main {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+.account-settings-dialog .settings-main {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.account-settings-dialog .settings-content {
+  display: block;
+  box-sizing: border-box;
+  flex: 1 1 0%;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+  scrollbar-color: #777 #171717;
+  padding-bottom: 36px;
+}
+.account-settings-dialog .settings-content::-webkit-scrollbar {
+  width: 12px;
+}
+.account-settings-dialog .settings-content::-webkit-scrollbar-track {
+  background: #171717;
+  border-radius: 8px;
+}
+.account-settings-dialog .settings-content::-webkit-scrollbar-thumb {
+  background: #777;
+  border: 3px solid #171717;
+  border-radius: 8px;
+}
+.account-settings-dialog .settings-content::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+.account-settings-dialog .settings-footer {
+  position: relative;
+  z-index: 4;
+  flex: 0 0 auto;
+  min-width: 0;
+  background: #050505;
+  box-shadow: 0 -8px 18px #0008;
+}
+.account-settings-dialog .settings-footer .settings-save,
+.account-settings-dialog .settings-footer .settings-cancel {
+  flex: 0 0 auto;
+}
+@media (max-width: 650px) {
+  .account-settings-dialog {
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+  .account-settings-dialog > form {
+    grid-template-columns: 112px minmax(0, 1fr);
+  }
+  .account-settings-dialog .settings-content {
+    padding: 58px 16px 28px;
+  }
+  .account-settings-dialog .settings-footer {
+    padding: 10px 12px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .account-settings-dialog .settings-footer > span {
+    display: none;
+  }
+}
+@media (max-width: 420px) {
+  .account-settings-dialog > form {
+    grid-template-columns: 94px minmax(0, 1fr);
+  }
+  .account-settings-dialog .settings-nav {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
