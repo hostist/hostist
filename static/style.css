@@ -434,12 +434,15 @@ body.layout,.layout,.conversation{background:#000;color:#f3f3f3}
 #account-menu .profile-popover-cover{
   display:block;
   position:relative;
-  height:58px!important;
-  min-height:58px!important;
-  max-height:58px!important;
+  height:76px!important;
+  min-height:76px!important;
+  max-height:76px!important;
   overflow:hidden!important;
-  background:#000!important;
-  background-image:none!important;
+  /* Keep the inline uploaded banner background-image; only set its fallback color. */
+  background-color:#000!important;
+  background-size:cover!important;
+  background-position:center!important;
+  background-repeat:no-repeat!important;
 }
 #account-menu .profile-popover-user .user-avatar,
 .user-bar .user-avatar{
@@ -515,39 +518,3 @@ body.layout,.layout,.conversation{background:#000;color:#f3f3f3}
 .settings-banner-editor{display:flex;flex-direction:column;align-items:flex-start;gap:9px;padding:12px;background:#232429;border-radius:8px}
 .settings-banner-editor img,.settings-banner-empty{width:100%;height:100px;object-fit:cover;border-radius:5px;background:#15151a;display:grid;place-items:center;color:#999;font-size:12px}
 #settings-banner-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
-
-
-/* Settings usability fix: keep Save Changes visible and make every settings pane scrollable. */
-.account-settings-dialog > form{
-  min-height:0;
-  overflow:hidden;
-}
-.account-settings-dialog .settings-main{
-  min-height:0;
-  height:100%;
-  overflow:hidden;
-}
-.account-settings-dialog .settings-content{
-  min-height:0;
-  flex:1 1 auto;
-  overflow-y:auto;
-  overflow-x:hidden;
-  overscroll-behavior:contain;
-  scrollbar-width:thin;
-  scrollbar-color:#666 #111;
-  -webkit-overflow-scrolling:touch;
-  scrollbar-gutter:stable;
-}
-.account-settings-dialog .settings-content::-webkit-scrollbar{width:10px}
-.account-settings-dialog .settings-content::-webkit-scrollbar-track{background:#111;border-radius:8px}
-.account-settings-dialog .settings-content::-webkit-scrollbar-thumb{background:#666;border:2px solid #111;border-radius:8px}
-.account-settings-dialog .settings-content::-webkit-scrollbar-thumb:hover{background:#888}
-.account-settings-dialog .settings-footer{
-  position:relative;
-  z-index:3;
-  flex:0 0 auto;
-}
-@media(max-width:650px){
-  .account-settings-dialog > form{min-height:0}
-  .account-settings-dialog .settings-content{min-height:0}
-}
