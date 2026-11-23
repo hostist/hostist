@@ -175,39 +175,38 @@ def logout():
 @require_auth
 def app_home():
     uid = session["uid"]
-    sid = request.args.get("server",type=int)
-    cid = request.args.get("channel",type=int)
-    dm_id = request.args.get("dm",type=int)
-    view = request.args.get("view", "servers")
+    sid = request.args.get("server", type=int)
+    cid = request.args.get("channel", type=int)
+    dm_id = request.args.get("dm", type=int)
+    view = request.args.get("view", "friends")
     if view not in ("servers", "friends"):
-        view = "servers"
+        view = "friends"
+
     with connect() as c:
         servers = c.execute("""SELECT s.*,m.role FROM servers s JOIN memberships m ON m.server_id=s.id
-                               WHERE m.user_id=? ORDER BY s.id""",(uid,)).fetchall()
-        if not servers:
-            return redirect(url_for("logout"))
+                               WHERE m.user_id=? ORDER BY s.id""", (uid,)).fetchall()
         server_ids = [s["id"] for s in servers]
-        if sid not in server_ids: sid = server_ids[0]
-        channels = c.execute("SELECT * FROM channels WHERE server_id=? ORDER BY id",(sid,)).fetchall()
-        if not channels:
-            c.execute("INSERT INTO channels(server_id,name,kind) VALUES(?,?,?)",(sid,"general","text"))
-            channels = c.execute("SELECT * FROM channels WHERE server_id=? ORDER BY id",(sid,)).fetchall()
-        if cid not in [x["id"] for x in channels]: cid = next((x["id"] for x in channels if x["kind"]=="text"),channels[0]["id"])
-        channel = next(x for x in channels if x["id"]==cid)
-        # Only fetch data for the active workspace. The old page loaded the
-        # server member list and all friend/DM data on every navigation.
-        members = []
-        history = []
-        friends = []
-        pending = []
-        dms = []
-        active_dm = None
-        dm_history = []
-        if view == "servers" and not dm_id:
+        if sid not in server_ids:
+            sid = server_ids[0] if server_ids else None
+
+        channels, channel, members, history = [], None, [], []
+        friends, pending, dms = [], [], []
+        active_dm, dm_history = None, []
+
+        if sid is not None:
+            channels = c.execute("SELECT * FROM channels WHERE server_id=? ORDER BY id", (sid,)).fetchall()
+            if not channels:
+                c.execute("INSERT INTO channels(server_id,name,kind) VALUES(?,?,?)", (sid, "general", "text"))
+                channels = c.execute("SELECT * FROM channels WHERE server_id=? ORDER BY id", (sid,)).fetchall()
+            if cid not in [x["id"] for x in channels]:
+                cid = next((x["id"] for x in channels if x["kind"] == "text"), channels[0]["id"])
+            channel = next(x for x in channels if x["id"] == cid)
+
+        if view == "servers" and sid is not None and not dm_id:
             members = c.execute("""SELECT u.id,u.username,u.avatar,u.status,m.role FROM users u
                                   JOIN memberships m ON m.user_id=u.id WHERE m.server_id=?
                                   ORDER BY m.role,u.username""", (sid,)).fetchall()
-            if channel["kind"] == "text":
+            if channel and channel["kind"] == "text":
                 history = c.execute("""SELECT m.content,m.created_at,u.username,u.avatar,m.id,m.user_id
                                        FROM messages m JOIN users u ON u.id=m.user_id
                                        WHERE m.channel_id=? ORDER BY m.id DESC LIMIT 60""", (cid,)).fetchall()
@@ -216,25 +215,35 @@ def app_home():
             friends = c.execute("""SELECT u.id,u.username,u.avatar,u.status FROM friendships f
                                   JOIN users u ON u.id=CASE WHEN f.requester_id=? THEN f.addressee_id ELSE f.requester_id END
                                   WHERE (f.requester_id=? OR f.addressee_id=?) AND f.status='accepted'
-                                  ORDER BY u.username""", (uid,uid,uid)).fetchall()
+                                  ORDER BY u.username""", (uid, uid, uid)).fetchall()
             pending = c.execute("""SELECT f.id,u.username FROM friendships f JOIN users u ON u.id=f.requester_id
                                   WHERE f.addressee_id=? AND f.status='pending' ORDER BY f.id DESC""", (uid,)).fetchall()
-            dms = c.execute("""SELECT dc.id,u.username,u.id AS other_id,u.avatar,u.status
-                               FROM dm_conversations dc JOIN dm_members mine ON mine.conversation_id=dc.id AND mine.user_id=?
-                               JOIN dm_members other ON other.conversation_id=dc.id AND other.user_id<>?
-                               JOIN users u ON u.id=other.user_id ORDER BY dc.id DESC LIMIT 100""", (uid,uid)).fetchall()
-            if dm_id and not dm_allowed(c,uid,dm_id):
+            dms = c.execute("""SELECT dc.id,
+                                      (SELECT group_concat(u.username, ', ') FROM dm_members x
+                                       JOIN users u ON u.id=x.user_id
+                                       WHERE x.conversation_id=dc.id AND x.user_id<>?) AS username,
+                                      (SELECT u.avatar FROM dm_members x JOIN users u ON u.id=x.user_id
+                                       WHERE x.conversation_id=dc.id AND x.user_id<>? ORDER BY x.user_id LIMIT 1) AS avatar
+                               FROM dm_conversations dc
+                               JOIN dm_members mine ON mine.conversation_id=dc.id AND mine.user_id=?
+                               ORDER BY dc.id DESC LIMIT 100""", (uid, uid, uid)).fetchall()
+            if dm_id and not dm_allowed(c, uid, dm_id):
                 dm_id = None
             if dm_id:
-                active_dm = c.execute("""SELECT u.id,u.username,u.avatar,u.status FROM dm_members d
-                                         JOIN users u ON u.id=d.user_id WHERE d.conversation_id=? AND d.user_id<>?""", (dm_id,uid)).fetchone()
+                active_dm = c.execute("""SELECT group_concat(u.username, ', ') AS username,
+                                                MIN(u.id) AS id, MAX(u.avatar) AS avatar,
+                                                MAX(u.status) AS status
+                                         FROM dm_members d JOIN users u ON u.id=d.user_id
+                                         WHERE d.conversation_id=? AND d.user_id<>?""", (dm_id, uid)).fetchone()
                 dm_history = c.execute("""SELECT m.content,m.created_at,u.username,u.avatar,m.id,m.user_id
                                           FROM dm_messages m JOIN users u ON u.id=m.user_id
                                           WHERE m.conversation_id=? ORDER BY m.id DESC LIMIT 60""", (dm_id,)).fetchall()
                 dm_history = list(reversed(dm_history))
-    return render_template("app.html",servers=servers,channels=channels,server_id=sid,channel=channel,
-                           members=members,history=history,username=session["username"],friends=friends,
-                           pending=pending,dms=dms,dm_id=dm_id,active_dm=active_dm,dm_history=dm_history,view=view)
+
+    return render_template("app.html", servers=servers, channels=channels, server_id=sid, channel=channel,
+                           members=members, history=history, username=session["username"], friends=friends,
+                           pending=pending, dms=dms, dm_id=dm_id, active_dm=active_dm,
+                           dm_history=dm_history, view=view)
 
 @app.post("/servers/create")
 @require_auth
@@ -248,7 +257,7 @@ def create_server():
             c.execute("INSERT INTO memberships(user_id,server_id,role,joined_at) VALUES(?,?,?,?)",(session["uid"],sid,"owner",now()))
             c.execute("INSERT INTO channels(server_id,name,kind) VALUES(?,?,?)",(sid,"general","text"))
             c.execute("INSERT INTO channels(server_id,name,kind) VALUES(?,?,?)",(sid,"voice","voice"))
-        return redirect(url_for("app_home",server=sid))
+        return redirect(url_for("app_home",server=sid,view="servers"))
     return redirect(url_for("app_home"))
 
 @app.post("/servers/join")
@@ -260,7 +269,7 @@ def join_server():
         if s:
             c.execute("INSERT OR IGNORE INTO memberships(user_id,server_id,role,joined_at) VALUES(?,?,?,?)",
                       (session["uid"],s["id"],"member",now()))
-            return redirect(url_for("app_home",server=s["id"]))
+            return redirect(url_for("app_home",server=s["id"],view="servers"))
     flash("That invite code is not valid.")
     return redirect(url_for("app_home"))
 
@@ -284,8 +293,8 @@ def create_channel():
         if name and re.fullmatch(r"[a-z0-9-]+",name) and kind in ("text","voice"):
             cur=c.execute("INSERT INTO channels(server_id,name,kind) VALUES(?,?,?)",(sid,name,kind))
             cid=cur.lastrowid
-            return redirect(url_for("app_home",server=sid,channel=cid))
-    return redirect(url_for("app_home",server=sid))
+            return redirect(url_for("app_home",server=sid,channel=cid,view="servers"))
+    return redirect(url_for("app_home",server=sid,view="servers"))
 
 @app.post("/friends/request")
 @require_auth
@@ -341,6 +350,28 @@ def open_dm(other_id):
             c.execute("INSERT INTO dm_members(conversation_id,user_id) VALUES(?,?)",(did,uid))
             c.execute("INSERT INTO dm_members(conversation_id,user_id) VALUES(?,?)",(did,other_id))
     return redirect(url_for("app_home",dm=did))
+
+@app.post("/dms/group")
+@require_auth
+def create_group_dm():
+    raw = request.form.get("usernames", "")
+    names = [n.strip() for n in raw.split(",") if n.strip()]
+    uid = session["uid"]
+    with connect() as c:
+        user_ids = []
+        for name in names[:9]:
+            row = c.execute("SELECT id FROM users WHERE username=?", (name,)).fetchone()
+            if row and row["id"] != uid and row["id"] not in user_ids:
+                user_ids.append(row["id"])
+        if not user_ids:
+            flash("Enter at least one valid HOSTIST username.")
+            return redirect(url_for("app_home", view="friends"))
+        cur = c.execute("INSERT INTO dm_conversations(created_at) VALUES(?)", (now(),))
+        did = cur.lastrowid
+        c.execute("INSERT INTO dm_members(conversation_id,user_id) VALUES(?,?)", (did, uid))
+        for other_id in user_ids:
+            c.execute("INSERT INTO dm_members(conversation_id,user_id) VALUES(?,?)", (did, other_id))
+    return redirect(url_for("app_home", view="friends", dm=did))
 
 @app.post("/profile")
 @require_auth

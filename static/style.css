@@ -198,3 +198,65 @@ body,.layout{background:#000;color:#f2f3f5}
 /* Custom HOSTIST home icon */
 .hostist-icon{overflow:hidden;background:#000;padding:0;border:1px solid #292929;}
 .hostist-icon img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit;}
+
+
+/* HOSTIST direct-message layout: monochrome, no third-party branding */
+:root{--bg:#000;--rail:#08090b;--panel:#111216;--panel2:#191a1e;--surface:#25262b;--line:#292a2f;--text:#f5f5f5;--muted:#9b9da5;--red:#d7d7d7;--red2:#fff;--green:#43c98a}
+body.layout,.layout,.conversation{background:#000;color:#f3f3f3}
+.guild-rail{width:72px;background:#090a0c;border-right:1px solid #222;gap:10px;padding:12px 0}
+.hostist-icon{background:#17181b;border:1px solid #444;border-radius:15px;overflow:hidden}
+.hostist-icon img{display:block;width:100%;height:100%;object-fit:contain;padding:5px}
+.hostist-icon.home-selected{background:#242529;border-color:#777}
+.guild{width:48px;height:48px;border-radius:50%;background:#1c1d21;color:#f4f4f4;border:1px solid #2d2e33}
+.guild:hover,.guild.chosen{background:#34353a;color:#fff;border-radius:15px}
+.guild.chosen:before,.guild:hover:before{background:#fff}
+.rail-line{background:#303136;height:1px}
+.server-plus-wrap{position:relative}
+.guild.add{background:#1b1c20;color:#fff;border:0;font-size:28px;font-weight:400}
+.guild.add:hover{background:#fff;color:#111}
+.server-plus-menu{position:absolute;z-index:50;left:58px;top:0;width:175px;padding:6px;background:#1a1b1f;border:1px solid #3a3b40;border-radius:9px;box-shadow:0 12px 30px #000b}
+.server-plus-menu[hidden]{display:none}
+.server-plus-menu button{display:block;width:100%;padding:10px;border:0;border-radius:6px;background:transparent;color:#f5f5f5;text-align:left;font-size:12px}
+.server-plus-menu button:hover{background:#303136}
+.side-panel{width:275px;background:#111216;border-right:1px solid #292a2f}
+.server-top{height:55px;background:#111216;border-bottom:1px solid #292a2f;padding:0 16px;color:#fff;font-size:15px}
+.side-scroll{padding:8px 8px 15px}
+.friend-nav-item{min-height:40px;padding:10px 12px;margin:2px 0;border-radius:8px;color:#c4c5ca;font-size:14px}
+.friend-nav-item span{color:#c4c5ca}
+.friend-nav-item:hover,.friend-nav-item.active{background:#303136;color:#fff}
+.friend-shortcuts{margin:19px 8px 8px;color:#c5c6cb;font-size:11px;font-weight:800;letter-spacing:.5px}
+.friend-shortcuts button{color:#ddd}
+.dm-row{padding:8px 9px;margin:3px 0;color:#d0d1d5;font-size:13px;border-radius:7px}
+.dm-row:hover,.dm-row.active{background:#292a2f;color:#fff}
+.mini-avatar{background:#34353a;color:#fff}
+.empty-side{color:#777980;padding:7px 9px}
+.conversation{background:#000}
+.chat-top{background:#000;border-bottom:1px solid #25262b}
+.friends-toolbar .discord-add,.white-btn{background:#fff;color:#111;border:1px solid #fff;border-radius:7px;font-weight:750}
+.friends-toolbar .discord-add:hover,.white-btn:hover{background:#ddd}
+.intro-symbol,.friends-icon,.voice-orb{background:#242529;color:#fff;box-shadow:none}
+.red-btn{background:#fff;color:#111}
+.red-btn:hover{background:#ddd}
+.call-action{background:#202125;color:#fff;border:1px solid #45464c}
+.top-action{background:#202125;color:#fff;border-color:#45464c}
+.user-bar{background:#101115;border-top:1px solid #292a2f}
+.user-avatar{background:#e7e7e7;color:#111}
+.profile-settings{color:#ddd!important}
+.voice-dock{left:calc(72px + 275px + 16px);background:rgba(18,19,22,.98);border-color:#444;box-shadow:0 14px 45px #0009}
+.server-empty-stage{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;text-align:center}
+.server-empty-stage h2{margin:0}.server-empty-stage p{color:#9b9da5;font-size:13px}
+.server-empty-stage .gray-btn,.server-empty-stage .white-btn{min-width:150px}
+@media(max-width:620px){.guild-rail{width:58px}.side-panel{width:215px}.voice-dock{left:calc(58px + 215px + 8px);right:8px}}
+
+.account-menu{background:#17181b;border-color:#3a3b40}
+.profile-popover-cover{background:linear-gradient(115deg,#35363b,#17181b 65%,#292a2f)}
+.profile-popover-user .user-avatar{border-color:#17181b}
+.profile-settings:hover{background:#303136;color:#fff}
+.voice-control{background:#25262b;border-color:#44464c;color:#f2f2f2}
+.voice-control:hover{background:#37383d}
+.voice-control.is-on{background:#3a3b40;border-color:#777;color:#fff}
+.voice-control.leave-call{background:#555;color:#fff;border-color:#777}
+.voice-control.leave-call:hover{background:#666}
+.empty-friends-icon{color:#d5d5d5}
+.friends-toolbar-title{color:#fff}
+.friends-tab.active{background:#242529;color:#fff}

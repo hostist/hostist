@@ -2,41 +2,54 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HOSTIST</title>
-<link rel="stylesheet" href="{{url_for('static',filename='style.css',v='20261123-logo1')}}">
+<link rel="stylesheet" href="{{url_for('static',filename='style.css',v='20261123-dmrail2')}}">
 </head>
 <body class="layout">
 <aside class="guild-rail">
-  <a class="hostist-icon {{'home-selected' if view=='friends' else ''}}" href="{{url_for('app_home',view='friends')}}" title="Home — Friends and DMs"><img src="{{url_for('static',filename='hostist-logo.png')}}" alt="HOSTIST"></a>
+  <a class="hostist-icon {{'home-selected' if view=='friends' else ''}}" href="{{url_for('app_home',view='friends')}}" title="HOSTIST — Direct messages"><img src="{{url_for('static',filename='hostist-logo.png')}}" alt="HOSTIST"></a>
   <div class="rail-line"></div>
-  <a class="rail-nav {{'selected' if view=='servers' else ''}}" href="{{url_for('app_home',view='servers',server=server_id)}}" title="Servers">▦</a>
-  <div class="rail-line"></div>
-  {% for s in servers %}<a class="guild {{'chosen' if s.id==server_id and view=='servers' else ''}}" href="{{url_for('app_home',server=s.id,view='servers')}}" title="{{s.name}}">{{s.name[:2]|upper}}</a>{% endfor %}
-  <button class="guild add" onclick="document.getElementById('create-server').showModal()" title="Create server">+</button>
-  <button class="guild add" onclick="document.getElementById('join-server').showModal()" title="Join server">↗</button>
-  <a class="guild exit" href="{{url_for('logout')}}" title="Log out">⇥</a>
+  {% for s in servers %}
+    <a class="guild {{'chosen' if s.id==server_id and view=='servers' else ''}}" href="{{url_for('app_home',server=s.id,view='servers')}}" title="{{s.name}}">{{s.name[:2]|upper}}</a>
+  {% endfor %}
+  <div class="server-plus-wrap">
+    <button class="guild add" type="button" onclick="toggleServerMenu()" title="Join or create a server" aria-expanded="false">+</button>
+    <div class="server-plus-menu" id="server-plus-menu" hidden>
+      <button type="button" onclick="document.getElementById('create-server').showModal();toggleServerMenu(false)">Create a server</button>
+      <button type="button" onclick="document.getElementById('join-server').showModal();toggleServerMenu(false)">Join a server</button>
+    </div>
+  </div>
 </aside>
 
 <aside class="side-panel">
 {% if view=='friends' %}
-  <header class="server-top"><span>Friends</span><button class="invite-mini" onclick="document.getElementById('add-friend').showModal()">＋</button></header>
+  <header class="server-top"><span>Direct messages</span></header>
   <div class="side-scroll friends-sidebar">
-    <input class="sidebar-search" id="friend-search" placeholder="Find or start a conversation" autocomplete="off">
-    <a class="friend-nav-item active" href="{{url_for('app_home',view='friends')}}"><span>♟</span> Friends</a>
-    <button class="friend-nav-item" type="button" onclick="document.getElementById('requests-panel').scrollIntoView({behavior:'smooth'})"><span>✉</span> Message Requests {% if pending %}<b class="nav-count">{{pending|length}}</b>{% endif %}</button>
-    <div class="friend-shortcuts"><span>DIRECT MESSAGES</span><button onclick="document.getElementById('add-friend').showModal()" title="Start a DM">＋</button></div>
-    {% for d in dms %}<a class="dm-row searchable {{'active' if dm_id==d.id else ''}}" data-search="{{d.username|lower}}" href="{{url_for('app_home',dm=d.id,view='friends')}}"><span class="mini-avatar">{{d.username[:1]|upper}}</span><span class="dm-name">{{d.username}}</span><i class="presence {{d.status}}"></i></a>{% else %}<p class="empty-side">Your direct messages will appear here.</p>{% endfor %}
-    <div id="requests-panel" class="friend-shortcuts request-heading"><span>MESSAGE REQUESTS</span></div>
-    {% for p in pending %}<form class="pending searchable" data-search="{{p.username|lower}}" method="post" action="{{url_for('accept_friend',fid=p.id)}}"><span>{{p.username}}</span><button class="accept">Accept</button></form>{% else %}<p class="empty-side">No new requests.</p>{% endfor %}
+    <a class="friend-nav-item {{'active' if not dm_id else ''}}" href="{{url_for('app_home',view='friends')}}"><span>♟</span> Friends</a>
+    <button class="friend-nav-item" type="button" onclick="document.getElementById('add-friend').showModal()"><span>⌕</span> Find people</button>
+    <button class="friend-nav-item" type="button" onclick="document.getElementById('create-group').showModal()"><span>♧</span> Create group</button>
+    <div class="friend-shortcuts"><span>DIRECT MESSAGES</span><button type="button" onclick="document.getElementById('add-friend').showModal()" title="Start a DM">＋</button></div>
+    {% for d in dms %}
+      <a class="dm-row searchable {{'active' if dm_id==d.id else ''}}" data-search="{{d.username|lower}}" href="{{url_for('app_home',dm=d.id,view='friends')}}">
+        <span class="mini-avatar">{{(d.username or '?')[:1]|upper}}</span><span class="dm-name">{{d.username or 'Direct message'}}</span>
+      </a>
+    {% else %}
+      <p class="empty-side">Your direct messages will appear here.</p>
+    {% endfor %}
   </div>
 {% else %}
-  <header class="server-top"><span>{{(servers|selectattr('id','equalto',server_id)|first).name}}</span><button title="Server invite" onclick="showInvite()">⌄</button></header>
-  <div class="side-scroll">
-    <div class="side-label">TEXT CHANNELS <button onclick="openChannel('text')">＋</button></div>
-    {% for ch in channels if ch.kind=='text' %}<a class="channel {{'active' if ch.id==channel.id and not dm_id else ''}}" href="{{url_for('app_home',server=server_id,channel=ch.id,view='servers')}}"><span>#</span>{{ch.name}}</a>{% endfor %}
-    <div class="side-label">VOICE CHANNELS <button onclick="openChannel('voice')">＋</button></div>
-    {% for ch in channels if ch.kind=='voice' %}<button class="channel voice-link" onclick="joinVoice({{ch.id}},{{ch.name|tojson}})"><span>◖</span>{{ch.name}}</button>{% endfor %}
-    <div class="server-sidebar-actions"><button onclick="showInvite()">＋ Invite people</button><button onclick="document.getElementById('join-server').showModal()">↗ Join another server</button></div>
-  </div>
+  {% if server_id %}
+    <header class="server-top"><span>{{(servers|selectattr('id','equalto',server_id)|first).name}}</span><button title="Server invite" onclick="showInvite()">⌄</button></header>
+    <div class="side-scroll">
+      <div class="side-label">TEXT CHANNELS <button onclick="openChannel('text')">＋</button></div>
+      {% for ch in channels if ch.kind=='text' %}<a class="channel {{'active' if ch.id==channel.id and not dm_id else ''}}" href="{{url_for('app_home',server=server_id,channel=ch.id,view='servers')}}"><span>#</span>{{ch.name}}</a>{% endfor %}
+      <div class="side-label">VOICE CHANNELS <button onclick="openChannel('voice')">＋</button></div>
+      {% for ch in channels if ch.kind=='voice' %}<button class="channel voice-link" onclick="joinVoice({{ch.id}},{{ch.name|tojson}})"><span>◖</span>{{ch.name}}</button>{% endfor %}
+      <div class="server-sidebar-actions"><button onclick="showInvite()">＋ Invite people</button></div>
+    </div>
+  {% else %}
+    <header class="server-top"><span>Servers</span></header>
+    <div class="side-scroll"><p class="empty-side">Join or create a server with the + button.</p></div>
+  {% endif %}
 {% endif %}
 <div class="account-menu" id="account-menu" hidden>
   <div class="profile-popover-cover"></div>
@@ -67,7 +80,9 @@
   <section class="friends-content"><div class="friends-main">
     <div class="friends-empty-state">{% if friends %}<h2>All Friends · {{friends|length}}</h2><div class="friends-grid">{% for f in friends %}<form class="friend-card" method="post" action="{{url_for('open_dm',other_id=f.id)}}"><span class="mini-avatar">{{f.username[:1]|upper}}</span><span class="friend-card-name"><b>{{f.username}}</b><small><i class="presence {{f.status}}"></i>{{f.status|title}}</small></span><button class="gray-btn">Message</button></form>{% endfor %}</div>{% else %}<div class="empty-friends-icon">♟</div><p>There are no friends online at this time. Check back later!</p>{% endif %}</div>
   </div><aside class="active-now"><h3>Active Now</h3>{% set online_friends = friends|selectattr('status','equalto','online')|list %}{% if online_friends %}{% for f in online_friends %}<form method="post" action="{{url_for('open_dm',other_id=f.id)}}" class="active-friend"><span class="mini-avatar">{{f.username[:1]|upper}}</span><span><b>{{f.username}}</b><small>Online</small></span><button aria-label="Message {{f.username}}">✉</button></form>{% endfor %}{% else %}<div class="active-empty"><b>It's quiet for now...</b><p>When a friend starts an activity, we'll show it here.</p></div>{% endif %}</aside></section>
-{% elif channel.kind=='text' %}
+{% elif view=='servers' and not server_id %}
+  <header class="chat-top"><b>Servers</b></header><section class="server-empty-stage"><h2>No servers yet</h2><p>Create your own server or join one using an invite code.</p><button class="white-btn" onclick="document.getElementById('create-server').showModal()">＋ Create a server</button><button class="gray-btn" onclick="document.getElementById('join-server').showModal()">Join a server</button></section>
+{% elif channel and channel.kind=='text' %}
   <header class="chat-top"><span class="channel-hash">#</span><b>{{channel.name}}</b><span class="topic">Welcome to {{channel.name}}</span><button class="top-action" onclick="document.getElementById('add-friend').showModal()">Add friend</button></header>
   <section class="chat-feed" id="feed"><div class="intro"><div class="intro-symbol">#</div><h2>Welcome to #{{channel.name}}</h2><p>This is the beginning of this channel. Say hello.</p></div>
   {% for m in history %}<article class="message"><div class="msg-avatar">{{m.username[:1]|upper}}</div><div><div class="msg-head"><b>{{m.username}}</b><time>{{m.created_at}}</time></div><p>{{m.content}}</p></div></article>{% endfor %}</section>
@@ -90,6 +105,7 @@
 <dialog id="join-server"><form method="post" action="{{url_for('join_server')}}"><h2>Join a server</h2><label>INVITE CODE</label><input name="invite" required placeholder="Paste a HOSTIST invite code"><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="red-btn">Join</button></div></form></dialog>
 <dialog id="create-channel"><form method="post" action="{{url_for('create_channel')}}"><h2>Create a channel</h2><input type="hidden" name="server_id" value="{{server_id}}"><input type="hidden" id="channel-kind" name="kind" value="text"><label>CHANNEL NAME</label><input name="name" maxlength="32" required placeholder="new-channel"><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="red-btn">Create</button></div></form></dialog>
 <dialog id="add-friend"><form method="post" action="{{url_for('friend_request')}}"><h2>Add a friend</h2><p class="modal-hint">Enter their exact HOSTIST username.</p><label>USERNAME</label><input name="username" required placeholder="username"><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="red-btn">Send request</button></div></form></dialog>
+<dialog id="create-group"><form method="post" action="{{url_for('create_group_dm')}}"><h2>Create a group</h2><p class="modal-hint">Enter HOSTIST usernames separated by commas.</p><label>PEOPLE</label><input name="usernames" required placeholder="alex, sam, jordan"><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="red-btn">Create group</button></div></form></dialog>
 <dialog id="profile-modal"><form method="post" action="{{url_for('profile')}}" enctype="multipart/form-data"><h2>Your profile</h2><label>PROFILE PICTURE</label><input type="file" name="avatar" accept="image/png,image/jpeg,image/gif,image/webp"><label>ABOUT ME</label><textarea name="bio" maxlength="160" placeholder="A little about yourself"></textarea><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="red-btn">Save</button></div></form></dialog>
 <div id="toast" class="toast"></div>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -97,6 +113,7 @@
 const socket=io();
 const ACCOUNT_USERNAME={{username|tojson}};
 const ACCOUNT_STORAGE_KEY='hostist.savedAccounts.v1';
+function toggleServerMenu(force){const menu=document.getElementById('server-plus-menu');const btn=document.querySelector('.server-plus-wrap>.guild.add');const open=typeof force==='boolean'?force:menu.hidden;menu.hidden=!open;if(btn)btn.setAttribute('aria-expanded',String(open));}
 function savedAccountNames(){try{return JSON.parse(localStorage.getItem(ACCOUNT_STORAGE_KEY)||'[]')}catch(e){return []}}
 function rememberCurrentAccount(){const names=savedAccountNames().filter(n=>typeof n==='string'&&n!==ACCOUNT_USERNAME);names.unshift(ACCOUNT_USERNAME);localStorage.setItem(ACCOUNT_STORAGE_KEY,JSON.stringify(names.slice(0,8)))}
 function toggleAccountMenu(){const menu=document.getElementById('account-menu');const trigger=document.getElementById('account-trigger');const open=menu.hidden;menu.hidden=!open;trigger.setAttribute('aria-expanded',String(open));if(!open)document.getElementById('saved-accounts').hidden=true}
