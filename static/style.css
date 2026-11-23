@@ -498,3 +498,11 @@ body.layout,.layout,.conversation{background:#000;color:#f3f3f3}
 #account-menu .profile-popover-handle-row{
   min-width:0;
 }
+
+
+/* Cache-busted compact profile avatar containment fix */
+#account-menu .profile-popover-user { display:flex!important; align-items:center!important; min-height:58px; }
+#account-menu .profile-popover-user > .user-avatar { display:block!important; position:relative!important; flex:0 0 54px!important; width:54px!important; height:54px!important; min-width:54px!important; min-height:54px!important; max-width:54px!important; max-height:54px!important; overflow:hidden!important; border-radius:50%!important; box-sizing:border-box!important; }
+#account-menu .profile-popover-user > .user-avatar > img { position:absolute!important; inset:0!important; display:block!important; width:100%!important; height:100%!important; min-width:0!important; min-height:0!important; max-width:100%!important; max-height:100%!important; object-fit:cover!important; border-radius:50%!important; }
+.user-bar .account-trigger > .user-avatar { display:block!important; position:relative!important; flex:0 0 34px!important; width:34px!important; height:34px!important; min-width:34px!important; min-height:34px!important; max-width:34px!important; max-height:34px!important; overflow:hidden!important; border-radius:50%!important; }
+.user-bar .account-trigger > .user-avatar > img { position:absolute!important; inset:0!important; display:block!important; width:100%!important; height:100%!important; min-width:0!important; min-height:0!important; max-width:100%!important; max-height:100%!important; object-fit:cover!important; border-radius:50%!important; }
