@@ -427,3 +427,74 @@ body.layout,.layout,.conversation{background:#000;color:#f3f3f3}
 .user-label small{display:block;max-width:155px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .profile-open[role="button"],.profile-open.friend-card-name{cursor:pointer;}
 .profile-open:focus-visible{outline:2px solid #aaa;outline-offset:2px;border-radius:5px;}
+
+
+/* Hard bounds for profile pictures in compact account UI.
+   Prevent global img rules from letting uploaded avatars escape their circular slots. */
+#account-menu .profile-popover-cover{
+  display:block;
+  position:relative;
+  height:58px!important;
+  min-height:58px!important;
+  max-height:58px!important;
+  overflow:hidden!important;
+  background:#000!important;
+  background-image:none!important;
+}
+#account-menu .profile-popover-user .user-avatar,
+.user-bar .user-avatar{
+  display:grid!important;
+  place-items:center;
+  position:relative;
+  flex:0 0 54px;
+  width:54px!important;
+  min-width:54px!important;
+  max-width:54px!important;
+  height:54px!important;
+  min-height:54px!important;
+  max-height:54px!important;
+  overflow:hidden!important;
+  border-radius:50%!important;
+  padding:0!important;
+  box-sizing:border-box!important;
+}
+.user-bar .user-avatar{
+  flex-basis:34px;
+  width:34px!important;
+  min-width:34px!important;
+  max-width:34px!important;
+  height:34px!important;
+  min-height:34px!important;
+  max-height:34px!important;
+}
+#account-menu .profile-popover-user .user-avatar img,
+.user-bar .user-avatar img{
+  display:block!important;
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  max-height:100%!important;
+  object-fit:cover!important;
+  object-position:center!important;
+  padding:0!important;
+  margin:0!important;
+  border:0!important;
+  border-radius:50%!important;
+  box-sizing:border-box!important;
+}
+#account-menu .profile-popover-user{
+  min-width:0;
+  overflow:hidden;
+}
+#account-menu .profile-popover-identity{
+  min-width:0;
+  flex:1 1 auto;
+  overflow:hidden;
+}
+#account-menu .profile-popover-handle-row{
+  min-width:0;
+}
