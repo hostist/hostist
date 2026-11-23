@@ -74,3 +74,13 @@ The Friends workspace now follows a Discord-inspired black layout with a convers
 Friends and Message Requests navigation, a separate DM list, an Active Now panel, and a
 profile popover opened from the signed-in user control at the bottom of the sidebar.
 The Servers workspace remains separate in the left server rail.
+
+## Loading-speed improvements in this build
+
+- The Socket.IO client script is loaded after the page markup so it does not block the initial layout from rendering.
+- The stylesheet URL is versioned and static assets receive a browser cache lifetime, reducing repeat-download time.
+- Server pages only load server-member and channel-message data; Friends pages only load friends, requests, and DM data.
+- Initial channel and DM history is limited to the latest 60 messages to keep page rendering lighter.
+- SQLite uses WAL mode, a short busy timeout, a page cache, and indexes for common membership, friendship, channel, and DM lookups.
+
+These changes reduce avoidable work, but actual speed still depends on the Render instance, database size, network, and browser. Render free instances may sleep when idle; code changes cannot remove that cold-start delay.

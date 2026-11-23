@@ -16,6 +16,8 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("ABYSS_SECRET", "replace-this-with-a-long-random-secret")
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
+# Cache versioned static assets so repeat visits do not redownload CSS.
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = timedelta(days=30)
 app.config["UPLOAD_FOLDER"] = UPLOAD_DIR
 socketio = SocketIO(app, cors_allowed_origins=[], async_mode="threading")
 # Active voice sessions map Socket.IO connection IDs to authorized room names.
@@ -26,6 +28,9 @@ def connect():
     c = sqlite3.connect(DB_PATH, timeout=15)
     c.row_factory = sqlite3.Row
     c.execute("PRAGMA foreign_keys=ON")
+    c.execute("PRAGMA busy_timeout=5000")
+    c.execute("PRAGMA cache_size=-12000")  # ~12 MB SQLite page cache per connection
+    c.execute("PRAGMA temp_store=MEMORY")
     return c
 
 def init_db():
@@ -76,7 +81,15 @@ def init_db():
         );
         CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel_id,id);
         CREATE INDEX IF NOT EXISTS idx_dm_messages_conversation ON dm_messages(conversation_id,id);
+        CREATE INDEX IF NOT EXISTS idx_memberships_user_server ON memberships(user_id,server_id);
+        CREATE INDEX IF NOT EXISTS idx_memberships_server ON memberships(server_id,user_id);
+        CREATE INDEX IF NOT EXISTS idx_friendships_addressee_status ON friendships(addressee_id,status,requester_id);
+        CREATE INDEX IF NOT EXISTS idx_friendships_requester_status ON friendships(requester_id,status,addressee_id);
+        CREATE INDEX IF NOT EXISTS idx_dm_members_user_conversation ON dm_members(user_id,conversation_id);
+        CREATE INDEX IF NOT EXISTS idx_channels_server_kind ON channels(server_id,kind,id);
         """)
+        c.execute("PRAGMA journal_mode=WAL")
+        c.execute("PRAGMA synchronous=NORMAL")
 
 def now():
     return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
@@ -181,35 +194,44 @@ def app_home():
             channels = c.execute("SELECT * FROM channels WHERE server_id=? ORDER BY id",(sid,)).fetchall()
         if cid not in [x["id"] for x in channels]: cid = next((x["id"] for x in channels if x["kind"]=="text"),channels[0]["id"])
         channel = next(x for x in channels if x["id"]==cid)
-        members = c.execute("""SELECT u.id,u.username,u.avatar,u.status,m.role FROM users u
-                              JOIN memberships m ON m.user_id=u.id WHERE m.server_id=? ORDER BY m.role,u.username""",(sid,)).fetchall()
+        # Only fetch data for the active workspace. The old page loaded the
+        # server member list and all friend/DM data on every navigation.
+        members = []
         history = []
-        if channel["kind"]=="text":
-            history = c.execute("""SELECT m.content,m.created_at,u.username,u.avatar,m.id,m.user_id
-                                   FROM messages m JOIN users u ON u.id=m.user_id
-                                   WHERE m.channel_id=? ORDER BY m.id DESC LIMIT 100""",(cid,)).fetchall()
-            history = list(reversed(history))
-        friends = c.execute("""SELECT u.id,u.username,u.avatar,u.status FROM friendships f
-                               JOIN users u ON u.id=CASE WHEN f.requester_id=? THEN f.addressee_id ELSE f.requester_id END
-                               WHERE (f.requester_id=? OR f.addressee_id=?) AND f.status='accepted'
-                               ORDER BY u.username""",(uid,uid,uid)).fetchall()
-        pending = c.execute("""SELECT f.id,u.username FROM friendships f JOIN users u ON u.id=f.requester_id
-                               WHERE f.addressee_id=? AND f.status='pending'""",(uid,)).fetchall()
-        dms = c.execute("""SELECT dc.id,u.username,u.id AS other_id,u.avatar,u.status
-                           FROM dm_conversations dc JOIN dm_members mine ON mine.conversation_id=dc.id AND mine.user_id=?
-                           JOIN dm_members other ON other.conversation_id=dc.id AND other.user_id<>?
-                           JOIN users u ON u.id=other.user_id ORDER BY dc.id DESC""",(uid,uid)).fetchall()
+        friends = []
+        pending = []
+        dms = []
         active_dm = None
         dm_history = []
-        if dm_id and not dm_allowed(c,uid,dm_id):
-            dm_id = None
-        if dm_id:
-            active_dm = c.execute("""SELECT u.id,u.username,u.avatar,u.status FROM dm_members d
-                                     JOIN users u ON u.id=d.user_id WHERE d.conversation_id=? AND d.user_id<>?""",(dm_id,uid)).fetchone()
-            dm_history = c.execute("""SELECT m.content,m.created_at,u.username,u.avatar,m.id,m.user_id
-                                      FROM dm_messages m JOIN users u ON u.id=m.user_id
-                                      WHERE m.conversation_id=? ORDER BY m.id DESC LIMIT 100""",(dm_id,)).fetchall()
-            dm_history = list(reversed(dm_history))
+        if view == "servers" and not dm_id:
+            members = c.execute("""SELECT u.id,u.username,u.avatar,u.status,m.role FROM users u
+                                  JOIN memberships m ON m.user_id=u.id WHERE m.server_id=?
+                                  ORDER BY m.role,u.username""", (sid,)).fetchall()
+            if channel["kind"] == "text":
+                history = c.execute("""SELECT m.content,m.created_at,u.username,u.avatar,m.id,m.user_id
+                                       FROM messages m JOIN users u ON u.id=m.user_id
+                                       WHERE m.channel_id=? ORDER BY m.id DESC LIMIT 60""", (cid,)).fetchall()
+                history = list(reversed(history))
+        elif view == "friends":
+            friends = c.execute("""SELECT u.id,u.username,u.avatar,u.status FROM friendships f
+                                  JOIN users u ON u.id=CASE WHEN f.requester_id=? THEN f.addressee_id ELSE f.requester_id END
+                                  WHERE (f.requester_id=? OR f.addressee_id=?) AND f.status='accepted'
+                                  ORDER BY u.username""", (uid,uid,uid)).fetchall()
+            pending = c.execute("""SELECT f.id,u.username FROM friendships f JOIN users u ON u.id=f.requester_id
+                                  WHERE f.addressee_id=? AND f.status='pending' ORDER BY f.id DESC""", (uid,)).fetchall()
+            dms = c.execute("""SELECT dc.id,u.username,u.id AS other_id,u.avatar,u.status
+                               FROM dm_conversations dc JOIN dm_members mine ON mine.conversation_id=dc.id AND mine.user_id=?
+                               JOIN dm_members other ON other.conversation_id=dc.id AND other.user_id<>?
+                               JOIN users u ON u.id=other.user_id ORDER BY dc.id DESC LIMIT 100""", (uid,uid)).fetchall()
+            if dm_id and not dm_allowed(c,uid,dm_id):
+                dm_id = None
+            if dm_id:
+                active_dm = c.execute("""SELECT u.id,u.username,u.avatar,u.status FROM dm_members d
+                                         JOIN users u ON u.id=d.user_id WHERE d.conversation_id=? AND d.user_id<>?""", (dm_id,uid)).fetchone()
+                dm_history = c.execute("""SELECT m.content,m.created_at,u.username,u.avatar,m.id,m.user_id
+                                          FROM dm_messages m JOIN users u ON u.id=m.user_id
+                                          WHERE m.conversation_id=? ORDER BY m.id DESC LIMIT 60""", (dm_id,)).fetchall()
+                dm_history = list(reversed(dm_history))
     return render_template("app.html",servers=servers,channels=channels,server_id=sid,channel=channel,
                            members=members,history=history,username=session["username"],friends=friends,
                            pending=pending,dms=dms,dm_id=dm_id,active_dm=active_dm,dm_history=dm_history,view=view)

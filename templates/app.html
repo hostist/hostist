@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HOSTIST</title>
-<link rel="stylesheet" href="{{url_for('static',filename='style.css')}}"><script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<link rel="stylesheet" href="{{url_for('static',filename='style.css',v='20261123-logo1')}}">
 </head>
 <body class="layout">
 <aside class="guild-rail">
-  <a class="hostist-icon {{'home-selected' if view=='friends' else ''}}" href="{{url_for('app_home',view='friends')}}" title="Home — Friends and DMs">H</a>
+  <a class="hostist-icon {{'home-selected' if view=='friends' else ''}}" href="{{url_for('app_home',view='friends')}}" title="Home — Friends and DMs"><img src="{{url_for('static',filename='hostist-logo.png')}}" alt="HOSTIST"></a>
   <div class="rail-line"></div>
   <a class="rail-nav {{'selected' if view=='servers' else ''}}" href="{{url_for('app_home',view='servers',server=server_id)}}" title="Servers">▦</a>
   <div class="rail-line"></div>
@@ -92,6 +92,7 @@
 <dialog id="add-friend"><form method="post" action="{{url_for('friend_request')}}"><h2>Add a friend</h2><p class="modal-hint">Enter their exact HOSTIST username.</p><label>USERNAME</label><input name="username" required placeholder="username"><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="red-btn">Send request</button></div></form></dialog>
 <dialog id="profile-modal"><form method="post" action="{{url_for('profile')}}" enctype="multipart/form-data"><h2>Your profile</h2><label>PROFILE PICTURE</label><input type="file" name="avatar" accept="image/png,image/jpeg,image/gif,image/webp"><label>ABOUT ME</label><textarea name="bio" maxlength="160" placeholder="A little about yourself"></textarea><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="red-btn">Save</button></div></form></dialog>
 <div id="toast" class="toast"></div>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
 const socket=io();
 const ACCOUNT_USERNAME={{username|tojson}};
