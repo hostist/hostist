@@ -121,7 +121,7 @@ function showSavedAccounts(){const box=document.getElementById('saved-accounts')
 rememberCurrentAccount();
 document.addEventListener('click',e=>{const menu=document.getElementById('account-menu');const trigger=document.getElementById('account-trigger');if(menu&&!menu.hidden&&!menu.contains(e.target)&&!trigger.contains(e.target)){menu.hidden=true;trigger.setAttribute('aria-expanded','false')}});
 
-const SERVER_ID={{server_id|tojson}}, CHANNEL_ID={{channel.id|tojson}}, CHANNEL_KIND={{channel.kind|tojson}}, DM_ID={{(dm_id or 0)|tojson}};
+const SERVER_ID={{(server_id|default(0, true))|tojson}}, CHANNEL_ID={{(channel.id if channel else 0)|tojson}}, CHANNEL_KIND={{(channel.kind if channel else 'text')|tojson}}, DM_ID={{(dm_id|default(0, true))|tojson}};
 const feed=document.getElementById('feed');
 function scrollFeed(){if(feed)feed.scrollTop=feed.scrollHeight}
 function toast(t){const el=document.getElementById('toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2800)}
