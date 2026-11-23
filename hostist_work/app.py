@@ -96,6 +96,8 @@ def init_db():
             c.execute("ALTER TABLE users ADD COLUMN display_name TEXT DEFAULT ''")
         if "date_of_birth" not in columns:
             c.execute("ALTER TABLE users ADD COLUMN date_of_birth TEXT")
+        if "pronouns" not in columns:
+            c.execute("ALTER TABLE users ADD COLUMN pronouns TEXT DEFAULT ''")
         # Enforce case-insensitive username and email uniqueness.
         try:
             c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_nocase ON users(username COLLATE NOCASE)")
@@ -246,12 +248,12 @@ def uploaded_file(filename):
 def public_profile(user_id):
     uid = session["uid"]
     with connect() as c:
-        user = c.execute("SELECT id,username,display_name,avatar,bio,status,created_at FROM users WHERE id=?", (user_id,)).fetchone()
+        user = c.execute("SELECT id,username,display_name,pronouns,avatar,bio,status,created_at FROM users WHERE id=?", (user_id,)).fetchone()
         if not user:
             abort(404)
         relation = c.execute("SELECT requester_id,addressee_id,status FROM friendships WHERE (requester_id=? AND addressee_id=?) OR (requester_id=? AND addressee_id=?)", (uid,user_id,user_id,uid)).fetchone() if uid != user_id else None
         mutual_servers = c.execute("SELECT COUNT(*) FROM memberships mine JOIN memberships theirs ON theirs.server_id=mine.server_id WHERE mine.user_id=? AND theirs.user_id=?", (uid,user_id)).fetchone()[0]
-        return jsonify({"id": user["id"], "username": user["username"], "display_name": user["display_name"] or user["username"], "avatar": url_for("uploaded_file", filename=user["avatar"]) if user["avatar"] else "", "bio": user["bio"] or "", "status": user["status"] or "offline", "created_at": user["created_at"], "is_self": uid == user_id, "friend_status": relation["status"] if relation else "none", "friend_request_incoming": bool(relation and relation["requester_id"] == user_id and relation["status"] == "pending"), "mutual_servers": mutual_servers})
+        return jsonify({"id": user["id"], "username": user["username"], "display_name": user["display_name"] or user["username"], "pronouns": user["pronouns"] or "", "avatar": url_for("uploaded_file", filename=user["avatar"]) if user["avatar"] else "", "bio": user["bio"] or "", "status": user["status"] or "offline", "created_at": user["created_at"], "is_self": uid == user_id, "friend_status": relation["status"] if relation else "none", "friend_request_incoming": bool(relation and relation["requester_id"] == user_id and relation["status"] == "pending"), "mutual_servers": mutual_servers})
 
 @app.route("/app")
 @require_auth
@@ -322,8 +324,10 @@ def app_home():
                                           WHERE m.conversation_id=? ORDER BY m.id DESC LIMIT 60""", (dm_id,)).fetchall()
                 dm_history = list(reversed(dm_history))
 
+    with connect() as c:
+        own_profile = c.execute("SELECT username,display_name,bio,pronouns,avatar FROM users WHERE id=?", (uid,)).fetchone()
     return render_template("app.html", servers=servers, channels=channels, server_id=sid, channel=channel,
-                           members=members, history=history, username=session["username"], friends=friends,
+                           members=members, history=history, username=session["username"], own_profile=own_profile, friends=friends,
                            pending=pending, dms=dms, dm_id=dm_id, active_dm=active_dm,
                            dm_history=dm_history, view=view)
 
@@ -458,19 +462,36 @@ def create_group_dm():
 @app.post("/profile")
 @require_auth
 def profile():
-    bio=request.form.get("bio","").strip()[:160]
-    avatar=session.get("avatar","")
+    bio=request.form.get("bio", "").strip()[:160]
+    display_name=request.form.get("display_name", "").strip()[:32]
+    username=request.form.get("username", "").strip()
+    pronouns=request.form.get("pronouns", "").strip()[:30]
+    if not display_name:
+        display_name = username
+    if len(display_name) > 32:
+        flash("Display name must be 32 characters or fewer.")
+        return redirect(url_for("app_home"))
+    if not re.fullmatch(r"[A-Za-z0-9_]{3,20}", username):
+        flash("Username must be 3–20 characters using letters, numbers, or underscores.")
+        return redirect(url_for("app_home"))
+    avatar=session.get("avatar", "")
     file=request.files.get("avatar")
     if file and file.filename:
         ext=os.path.splitext(secure_filename(file.filename))[1].lower()
-        if ext not in (".png",".jpg",".jpeg",".gif",".webp"): 
+        if ext not in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
             flash("Avatar must be PNG, JPG, GIF, or WEBP.")
             return redirect(url_for("app_home"))
         filename=f"user_{session['uid']}_{secrets.token_hex(5)}{ext}"
-        file.save(os.path.join(UPLOAD_DIR,filename))
+        file.save(os.path.join(UPLOAD_DIR, filename))
         avatar=filename
     with connect() as c:
-        c.execute("UPDATE users SET bio=?,avatar=? WHERE id=?",(bio,avatar,session["uid"]))
+        taken=c.execute("SELECT id FROM users WHERE username=? COLLATE NOCASE AND id<>?", (username, session["uid"])).fetchone()
+        if taken:
+            flash("That username is already taken. Choose another one.")
+            return redirect(url_for("app_home"))
+        c.execute("UPDATE users SET username=?,display_name=?,pronouns=?,bio=?,avatar=? WHERE id=?",
+                  (username, display_name, pronouns, bio, avatar, session["uid"]))
+    session["username"] = username
     flash("Profile updated.")
     return redirect(url_for("app_home"))
 
