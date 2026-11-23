@@ -92,3 +92,11 @@ These changes reduce avoidable work, but actual speed still depends on the Rende
 - Registration asks users to confirm their password and requires at least 8 characters.
 - Passwords are stored as Werkzeug password hashes, never as plain text.
 - Logging in requires the correct password; knowing an existing username is not enough to access its account.
+
+## Deployment persistence (important)
+
+For Render, deploy updates to the **same existing web service** and keep its persistent disk attached at `/var/data`. The included `render.yaml` sets `ABYSS_DATA_DIR=/var/data` and creates `ABYSS_SECRET` once for the service. Do not delete/recreate the service or its disk when publishing a code update.
+
+This build automatically uses `/var/data` when it detects the Render disk, even if `ABYSS_DATA_DIR` was accidentally omitted. If it finds an older `abyss.db` and `uploads/` beside `app.py` while the persistent disk has no database yet, it copies them to the disk once. It never overwrites a database already on the disk. The session-signing key is also kept on the persistent disk when `ABYSS_SECRET` is not configured.
+
+After deployment, check the Render logs for `HOSTIST persistent data directory: /var/data`. If the persistent database and uploads were already deleted by an earlier deployment and there is no backup or attached old disk, this code cannot reconstruct those lost accounts; attach/restore the old disk or database backup before starting with an empty volume.

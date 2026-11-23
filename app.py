@@ -1,4 +1,4 @@
-import os, re, sqlite3, secrets
+import os, re, sqlite3, secrets, shutil
 from datetime import datetime, timedelta, date
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, abort, send_from_directory, has_request_context
@@ -7,14 +7,70 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.environ.get("ABYSS_DATA_DIR", ROOT)
+
+# Prefer the explicitly configured persistent volume. If the hosting platform
+# has mounted Render's standard disk but the environment variable was omitted,
+# discover /var/data automatically instead of silently creating a fresh DB in
+# the temporary application directory.
+_configured_data_dir = os.environ.get("ABYSS_DATA_DIR", "").strip()
+if _configured_data_dir:
+    DATA_DIR = os.path.abspath(_configured_data_dir)
+else:
+    _render_disk = "/var/data"
+    DATA_DIR = _render_disk if os.path.isdir(_render_disk) and os.access(_render_disk, os.W_OK) else ROOT
 os.makedirs(DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(DATA_DIR, "abyss.db")
 UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# One-time migration for older HOSTIST deployments that kept SQLite/uploads
+# beside app.py. The migration only runs when the persistent volume has no DB,
+# so it never overwrites an existing account database on later deployments.
+_legacy_db = os.path.join(ROOT, "abyss.db")
+if os.path.abspath(DATA_DIR) != os.path.abspath(ROOT) and not os.path.exists(DB_PATH) and os.path.isfile(_legacy_db):
+    try:
+        _source = sqlite3.connect(_legacy_db, timeout=30)
+        _target = sqlite3.connect(DB_PATH, timeout=30)
+        try:
+            _source.backup(_target)
+        finally:
+            _target.close()
+            _source.close()
+        _legacy_uploads = os.path.join(ROOT, "uploads")
+        if os.path.isdir(_legacy_uploads):
+            shutil.copytree(_legacy_uploads, UPLOAD_DIR, dirs_exist_ok=True)
+    except Exception:
+        # Fail loudly rather than starting against an empty database and
+        # making existing users think their accounts have disappeared.
+        try:
+            if os.path.exists(DB_PATH):
+                os.remove(DB_PATH)
+        except OSError:
+            pass
+        raise
+
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get("ABYSS_SECRET", "replace-this-with-a-long-random-secret")
+app.logger.info("HOSTIST persistent data directory: %s", DATA_DIR)
+# Render's generated ABYSS_SECRET remains stable for an existing service. For
+# self-hosted installs without that variable, keep a generated key on the same
+# persistent disk so browser sessions survive ordinary code deployments.
+_secret_from_env = os.environ.get("ABYSS_SECRET")
+if _secret_from_env:
+    _session_secret = _secret_from_env
+else:
+    _secret_path = os.path.join(DATA_DIR, "hostist_session_secret")
+    if os.path.isfile(_secret_path):
+        with open(_secret_path, "r", encoding="utf-8") as _secret_file:
+            _session_secret = _secret_file.read().strip()
+    else:
+        _session_secret = secrets.token_urlsafe(48)
+        with open(_secret_path, "w", encoding="utf-8") as _secret_file:
+            _secret_file.write(_session_secret)
+        try:
+            os.chmod(_secret_path, 0o600)
+        except OSError:
+            pass
+app.config["SECRET_KEY"] = _session_secret
 app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
 # Keep users signed in across browser restarts. The signing key must remain stable
 # between deployments (Render's generated ABYSS_SECRET provides that).
