@@ -325,7 +325,20 @@ def app_home():
                 dm_history = list(reversed(dm_history))
 
     with connect() as c:
-        own_profile = c.execute("SELECT id,username,display_name,bio,pronouns,avatar FROM users WHERE id=?", (uid,)).fetchone()
+        # The profile modal calls /api/users/<id>/profile. Always include the
+        # primary key here so the signed-in user's own profile button has a
+        # real user ID instead of generating a request for /api/users/None.
+        own_profile = c.execute(
+            "SELECT id,username,display_name,bio,pronouns,avatar FROM users WHERE id=?",
+            (uid,)
+        ).fetchone()
+
+    # A stale login session can outlive a deleted account. Send the user back
+    # to login instead of rendering a broken profile control.
+    if own_profile is None:
+        session.clear()
+        return redirect(url_for("login"))
+
     return render_template("app.html", servers=servers, channels=channels, server_id=sid, channel=channel,
                            members=members, history=history, username=session["username"], own_profile=own_profile, friends=friends,
                            pending=pending, dms=dms, dm_id=dm_id, active_dm=active_dm,

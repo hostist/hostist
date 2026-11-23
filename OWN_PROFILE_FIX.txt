@@ -1,16 +1,27 @@
-FIX: VIEW YOUR OWN PROFILE
+HOSTIST — OWN PROFILE LOADING FIX
 
-Cause:
-The app page loaded the signed-in user's profile without selecting the users.id
-column, but the "View my profile" button used own_profile.id to call the profile API.
-That left the ID empty and prevented the profile from opening.
-
-Fix:
-The own_profile query now selects id along with username, display_name, bio,
-pronouns, and avatar.
+What was fixed:
+- The signed-in user's profile query explicitly selects users.id. The
+  "View my profile" button uses this ID to request /api/users/<id>/profile.
+- If a login session refers to an account that no longer exists, the app now
+  clears that stale session and redirects to login rather than rendering a
+  broken profile control.
+- The profile API returns is_self=true for the signed-in user's own profile;
+  the existing UI then shows the Edit Profile action.
 
 Deploy:
-1. Replace the existing app.py and the rest of the project with these ZIP contents.
-2. Commit and push to the Render-connected GitHub branch.
-3. Deploy on Render.
-4. Hard-refresh the app (Ctrl+Shift+R).
+1. Back up your current project and keep your Render persistent disk intact.
+2. Extract this ZIP and replace the project files in your GitHub repository,
+   preserving the folders (templates/ and static/).
+3. Commit and push to the branch connected to Render.
+4. In Render, deploy the latest commit.
+5. After deployment, hard-refresh the site with Ctrl+Shift+R.
+
+Do not delete or recreate the Render persistent disk. It contains your HOSTIST
+SQLite database and uploaded files.
+
+Validation:
+- app.py passes Python bytecode compilation.
+- The own-profile query includes the primary key used by the profile button.
+- Runtime Flask smoke testing could not be run in this build environment
+  because Flask is not installed here.
