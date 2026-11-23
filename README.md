@@ -1,7 +1,5 @@
 # HOSTIST
 
-HOSTIST is a Discord-inspired, self-hosted community chat starter made with Python, Flask, Flask-SocketIO, SQLite, HTML, CSS, and browser WebRTC.
-
 ## Run locally
 
 1. Install Python 3.10+.
