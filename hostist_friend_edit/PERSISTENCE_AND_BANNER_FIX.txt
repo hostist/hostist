@@ -1,0 +1,25 @@
+HOSTIST — PERSISTENCE + PROFILE BANNER FIX
+
+This update fixes two separate deployment problems:
+
+1) The compact account menu had a CSS background shorthand with !important.
+   That shorthand reset the inline uploaded background-image. It now sets only
+   background-color, allowing the user's uploaded banner to show in the compact
+   account menu as well as the full public profile.
+
+2) Account data could be stored beside app.py on an ephemeral deployment
+   filesystem. The app now prefers ABYSS_DATA_DIR, auto-detects /var/data when
+   available, and performs a one-time migration of an old app-root abyss.db and
+   uploads/ directory to the persistent volume if the volume has no database.
+   Existing databases on the persistent volume are never overwritten.
+
+RENDER DEPLOYMENT CHECKLIST
+- Update the existing Render service; do not delete/recreate it.
+- Keep the existing persistent disk attached at /var/data.
+- Keep ABYSS_SECRET unchanged.
+- Keep ABYSS_DATA_DIR=/var/data.
+- After deployment, verify logs say: HOSTIST persistent data directory: /var/data
+- The ZIP preserves the settings scrollbar and Save Changes footer.
+
+Important: if the previous ephemeral database was already erased and no backup
+or old persistent disk exists, lost accounts cannot be recreated by a code fix.
