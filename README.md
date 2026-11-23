@@ -84,3 +84,11 @@ The Servers workspace remains separate in the left server rail.
 - SQLite uses WAL mode, a short busy timeout, a page cache, and indexes for common membership, friendship, channel, and DM lookups.
 
 These changes reduce avoidable work, but actual speed still depends on the Render instance, database size, network, and browser. Render free instances may sleep when idle; code changes cannot remove that cold-start delay.
+
+## Account registration and username ownership
+
+- New users must create an account with a username and password before using HOSTIST.
+- Usernames are unique without regard to capitalization, so `Host`, `host`, and `HOST` refer to the same claimed name.
+- Registration asks users to confirm their password and requires at least 8 characters.
+- Passwords are stored as Werkzeug password hashes, never as plain text.
+- Logging in requires the correct password; knowing an existing username is not enough to access its account.

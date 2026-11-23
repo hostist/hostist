@@ -88,6 +88,13 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_dm_members_user_conversation ON dm_members(user_id,conversation_id);
         CREATE INDEX IF NOT EXISTS idx_channels_server_kind ON channels(server_id,kind,id);
         """)
+        # Enforce case-insensitive username uniqueness for new registrations.
+        # Older databases may already contain names that differ only by case;
+        # in that case the registration route still checks under BEGIN IMMEDIATE.
+        try:
+            c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_nocase ON users(username COLLATE NOCASE)")
+        except sqlite3.IntegrityError:
+            app.logger.warning("Existing usernames differ only by capitalization; new registrations will still be checked case-insensitively.")
         c.execute("PRAGMA journal_mode=WAL")
         c.execute("PRAGMA synchronous=NORMAL")
 
@@ -124,29 +131,60 @@ def home():
 
 @app.route("/register", methods=["GET","POST"])
 def register():
+    if logged_in():
+        return redirect(url_for("app_home"))
     if request.method == "POST":
-        username = request.form.get("username","").strip()
-        password = request.form.get("password","")
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
         if not re.fullmatch(r"[A-Za-z0-9_]{3,20}", username):
             flash("Username must be 3–20 characters using letters, numbers, or underscores.")
         elif len(password) < 8:
             flash("Password must be at least 8 characters.")
+        elif len(password) > 128:
+            flash("Password must be 128 characters or fewer.")
+        elif password != confirm_password:
+            flash("Your passwords do not match.")
         else:
             try:
                 with connect() as c:
-                    cur = c.execute("INSERT INTO users(username,password_hash,created_at) VALUES(?,?,?)",
-                                    (username,generate_password_hash(password),now()))
-                    uid = cur.lastrowid
-                    cur = c.execute("INSERT INTO servers(name,owner_id,invite_code,created_at) VALUES(?,?,?,?)",
-                                    (username+"'s space",uid,secrets.token_urlsafe(8),now()))
-                    sid = cur.lastrowid
-                    c.execute("INSERT INTO memberships(user_id,server_id,role,joined_at) VALUES(?,?,?,?)",(uid,sid,"owner",now()))
-                    c.execute("INSERT INTO channels(server_id,name,kind) VALUES(?,?,?)",(sid,"general","text"))
-                    c.execute("INSERT INTO channels(server_id,name,kind) VALUES(?,?,?)",(sid,"voice","voice"))
-                session["uid"], session["username"] = uid, username
-                return redirect(url_for("app_home"))
+                    # Serialize the check-and-create operation so two people
+                    # cannot claim the same username at the same time.
+                    c.execute("BEGIN IMMEDIATE")
+                    existing = c.execute(
+                        "SELECT id FROM users WHERE username = ? COLLATE NOCASE",
+                        (username,)
+                    ).fetchone()
+                    if existing:
+                        flash("That username is already taken. Choose another one.")
+                    else:
+                        cur = c.execute(
+                            "INSERT INTO users(username,password_hash,created_at) VALUES(?,?,?)",
+                            (username, generate_password_hash(password), now())
+                        )
+                        uid = cur.lastrowid
+                        cur = c.execute(
+                            "INSERT INTO servers(name,owner_id,invite_code,created_at) VALUES(?,?,?,?)",
+                            (username + "'s space", uid, secrets.token_urlsafe(8), now())
+                        )
+                        sid = cur.lastrowid
+                        c.execute(
+                            "INSERT INTO memberships(user_id,server_id,role,joined_at) VALUES(?,?,?,?)",
+                            (uid, sid, "owner", now())
+                        )
+                        c.execute(
+                            "INSERT INTO channels(server_id,name,kind) VALUES(?,?,?)",
+                            (sid, "general", "text")
+                        )
+                        c.execute(
+                            "INSERT INTO channels(server_id,name,kind) VALUES(?,?,?)",
+                            (sid, "voice", "voice")
+                        )
+                        session.clear()
+                        session["uid"], session["username"] = uid, username
+                        return redirect(url_for("app_home"))
             except sqlite3.IntegrityError:
-                flash("That username is already in use.")
+                flash("That username is already taken. Choose another one.")
     return render_template("auth.html", mode="register")
 
 @app.route("/login", methods=["GET","POST"])
@@ -155,7 +193,7 @@ def login():
         username = request.form.get("username","").strip()
         password = request.form.get("password","")
         with connect() as c:
-            u = c.execute("SELECT * FROM users WHERE username=?",(username,)).fetchone()
+            u = c.execute("SELECT * FROM users WHERE username = ? COLLATE NOCASE", (username,)).fetchone()
             if u and check_password_hash(u["password_hash"],password):
                 session["uid"], session["username"] = u["id"],u["username"]
                 c.execute("UPDATE users SET status='online' WHERE id=?",(u["id"],))
