@@ -1,5 +1,5 @@
 import os, re, sqlite3, secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, abort
 from flask_socketio import SocketIO, join_room, leave_room, emit
@@ -88,13 +88,23 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_dm_members_user_conversation ON dm_members(user_id,conversation_id);
         CREATE INDEX IF NOT EXISTS idx_channels_server_kind ON channels(server_id,kind,id);
         """)
-        # Enforce case-insensitive username uniqueness for new registrations.
-        # Older databases may already contain names that differ only by case;
-        # in that case the registration route still checks under BEGIN IMMEDIATE.
+        # Add profile fields without destroying existing account data.
+        columns = {row[1] for row in c.execute("PRAGMA table_info(users)").fetchall()}
+        if "email" not in columns:
+            c.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        if "display_name" not in columns:
+            c.execute("ALTER TABLE users ADD COLUMN display_name TEXT DEFAULT ''")
+        if "date_of_birth" not in columns:
+            c.execute("ALTER TABLE users ADD COLUMN date_of_birth TEXT")
+        # Enforce case-insensitive username and email uniqueness.
         try:
             c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_nocase ON users(username COLLATE NOCASE)")
         except sqlite3.IntegrityError:
             app.logger.warning("Existing usernames differ only by capitalization; new registrations will still be checked case-insensitively.")
+        try:
+            c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_nocase ON users(email COLLATE NOCASE) WHERE email IS NOT NULL AND email != ''")
+        except sqlite3.IntegrityError:
+            app.logger.warning("Existing accounts contain duplicate email addresses; new registrations will still be checked case-insensitively.")
         c.execute("PRAGMA journal_mode=WAL")
         c.execute("PRAGMA synchronous=NORMAL")
 
@@ -134,58 +144,76 @@ def register():
     if logged_in():
         return redirect(url_for("app_home"))
     if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        display_name = request.form.get("display_name", "").strip()
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
-        confirm_password = request.form.get("confirm_password", "")
-        if not re.fullmatch(r"[A-Za-z0-9_]{3,20}", username):
+        month = request.form.get("birth_month", "")
+        day = request.form.get("birth_day", "")
+        year = request.form.get("birth_year", "")
+        dob = None
+
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) or len(email) > 254:
+            flash("Enter a valid email address.")
+        elif len(display_name) > 32:
+            flash("Display name must be 32 characters or fewer.")
+        elif not re.fullmatch(r"[A-Za-z0-9_]{3,20}", username):
             flash("Username must be 3–20 characters using letters, numbers, or underscores.")
         elif len(password) < 8:
             flash("Password must be at least 8 characters.")
         elif len(password) > 128:
             flash("Password must be 128 characters or fewer.")
-        elif password != confirm_password:
-            flash("Your passwords do not match.")
         else:
             try:
-                with connect() as c:
-                    # Serialize the check-and-create operation so two people
-                    # cannot claim the same username at the same time.
-                    c.execute("BEGIN IMMEDIATE")
-                    existing = c.execute(
-                        "SELECT id FROM users WHERE username = ? COLLATE NOCASE",
-                        (username,)
-                    ).fetchone()
-                    if existing:
-                        flash("That username is already taken. Choose another one.")
-                    else:
-                        cur = c.execute(
-                            "INSERT INTO users(username,password_hash,created_at) VALUES(?,?,?)",
-                            (username, generate_password_hash(password), now())
-                        )
-                        uid = cur.lastrowid
-                        cur = c.execute(
-                            "INSERT INTO servers(name,owner_id,invite_code,created_at) VALUES(?,?,?,?)",
-                            (username + "'s space", uid, secrets.token_urlsafe(8), now())
-                        )
-                        sid = cur.lastrowid
-                        c.execute(
-                            "INSERT INTO memberships(user_id,server_id,role,joined_at) VALUES(?,?,?,?)",
-                            (uid, sid, "owner", now())
-                        )
-                        c.execute(
-                            "INSERT INTO channels(server_id,name,kind) VALUES(?,?,?)",
-                            (sid, "general", "text")
-                        )
-                        c.execute(
-                            "INSERT INTO channels(server_id,name,kind) VALUES(?,?,?)",
-                            (sid, "voice", "voice")
-                        )
-                        session.clear()
-                        session["uid"], session["username"] = uid, username
-                        return redirect(url_for("app_home"))
-            except sqlite3.IntegrityError:
-                flash("That username is already taken. Choose another one.")
-    return render_template("auth.html", mode="register")
+                dob = date(int(year), int(month), int(day))
+                if dob > date.today():
+                    raise ValueError
+            except (TypeError, ValueError):
+                flash("Choose a valid date of birth.")
+                dob = None
+
+            if dob:
+                try:
+                    with connect() as c:
+                        # Serialize validation and creation to prevent duplicate claims.
+                        c.execute("BEGIN IMMEDIATE")
+                        existing_name = c.execute(
+                            "SELECT id FROM users WHERE username = ? COLLATE NOCASE", (username,)
+                        ).fetchone()
+                        existing_email = c.execute(
+                            "SELECT id FROM users WHERE email = ? COLLATE NOCASE", (email,)
+                        ).fetchone()
+                        if existing_name:
+                            flash("That username is already taken. Choose another one.")
+                        elif existing_email:
+                            flash("An account already uses that email address.")
+                        else:
+                            cur = c.execute(
+                                "INSERT INTO users(username,password_hash,created_at,email,display_name,date_of_birth) VALUES(?,?,?,?,?,?)",
+                                (username, generate_password_hash(password), now(), email, display_name, dob.isoformat())
+                            )
+                            uid = cur.lastrowid
+                            cur = c.execute(
+                                "INSERT INTO servers(name,owner_id,invite_code,created_at) VALUES(?,?,?,?)",
+                                (username + "'s space", uid, secrets.token_urlsafe(8), now())
+                            )
+                            sid = cur.lastrowid
+                            c.execute(
+                                "INSERT INTO memberships(user_id,server_id,role,joined_at) VALUES(?,?,?,?)",
+                                (uid, sid, "owner", now())
+                            )
+                            c.execute(
+                                "INSERT INTO channels(server_id,name,kind) VALUES(?,?,?)", (sid, "general", "text")
+                            )
+                            c.execute(
+                                "INSERT INTO channels(server_id,name,kind) VALUES(?,?,?)", (sid, "voice", "voice")
+                            )
+                            session.clear()
+                            session["uid"], session["username"] = uid, username
+                            return redirect(url_for("app_home"))
+                except sqlite3.IntegrityError:
+                    flash("That username or email is already registered. Please choose another.")
+    return render_template("auth.html", mode="register", current_year=date.today().year)
 
 @app.route("/login", methods=["GET","POST"])
 def login():

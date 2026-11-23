@@ -1,5 +1,81 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HOSTIST • {{ mode|title }}</title><link rel="stylesheet" href="{{ url_for('static',filename='style.css') }}"></head>
-<body class="auth-bg"><div class="auth-wrap"><div class="brand-symbol">H</div><div class="wordmark">HOSTIST</div><p class="tagline">Find your people. Lose yourself in conversation.</p><section class="auth-card"><h1>{{ 'Create your account' if mode=='register' else 'Welcome back' }}</h1><p class="sub">{{ 'Join the community.' if mode=='register' else 'Your conversations are waiting.' }}</p>
-{% with msgs=get_flashed_messages() %}{% for m in msgs %}<div class="flash">{{m}}</div>{% endfor %}{% endwith %}
-<form method="post"><label>USERNAME</label><input name="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" title="3–20 letters, numbers, or underscores" required autocomplete="username" value="{{ prefill_username|default('') }}" placeholder="Your username">{% if mode=='register' %}<small class="auth-help">Usernames are unique, including capitalization.</small>{% endif %}<label>PASSWORD</label><input name="password" type="password" minlength="8" maxlength="128" required autocomplete="{{ 'new-password' if mode=='register' else 'current-password' }}" placeholder="{{ 'At least 8 characters' if mode=='register' else 'Your password' }}">{% if mode=='register' %}<label>CONFIRM PASSWORD</label><input name="confirm_password" type="password" minlength="8" maxlength="128" required autocomplete="new-password" placeholder="Enter your password again">{% endif %}<button class="red-btn full">{{ 'Create account' if mode=='register' else 'Log in' }}</button></form>
-<p class="auth-switch">{{ 'Already have an account?' if mode=='register' else "New to HOSTIST?" }} <a href="{{url_for('login' if mode=='register' else 'register')}}">{{'Log in' if mode=='register' else 'Create an account'}}</a></p></section><span class="footer-note">HOSTIST COMMUNITY PLATFORM</span></div></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>HOSTIST • {{ mode|title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static',filename='style.css') }}">
+</head>
+<body class="auth-bg {% if mode == 'register' %}register-page{% endif %}">
+  <div class="auth-wrap">
+    {% if mode != 'register' %}
+      <div class="brand-symbol">H</div>
+      <div class="wordmark">HOSTIST</div>
+      <p class="tagline">Find your people. Lose yourself in conversation.</p>
+    {% endif %}
+    <section class="auth-card {% if mode == 'register' %}signup-card{% endif %}">
+      <h1>{{ 'Create an account' if mode=='register' else 'Welcome back' }}</h1>
+      {% if mode != 'register' %}<p class="sub">Your conversations are waiting.</p>{% endif %}
+      {% with msgs=get_flashed_messages() %}
+        {% for m in msgs %}<div class="flash">{{ m }}</div>{% endfor %}
+      {% endwith %}
+      <form method="post" autocomplete="on">
+        {% if mode == 'register' %}
+          <label for="email">Email <span class="required-star">*</span></label>
+          <input id="email" name="email" type="email" maxlength="254" required autocomplete="email" placeholder="Enter your email">
+
+          <label for="display_name">Display Name</label>
+          <input id="display_name" name="display_name" type="text" maxlength="32" autocomplete="nickname" placeholder="How people will see you (optional)">
+
+          <label for="username">Username <span class="required-star">*</span></label>
+          <input id="username" name="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" title="3–20 letters, numbers, or underscores" required autocomplete="username" placeholder="Choose a username">
+          <small class="auth-help">Usernames are unique, including capitalization.</small>
+
+          <label for="password">Password <span class="required-star">*</span></label>
+          <div class="password-field">
+            <input id="password" name="password" type="password" minlength="8" maxlength="128" required autocomplete="new-password" placeholder="Create a password">
+            <button class="password-toggle" type="button" aria-label="Show password" aria-pressed="false" onclick="togglePassword()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          </div>
+
+          <label>Date of Birth <span class="required-star">*</span></label>
+          <div class="birth-fields">
+            <select name="birth_month" required aria-label="Birth month">
+              <option value="" disabled selected>Month</option>
+              {% for n, name in [(1,'January'),(2,'February'),(3,'March'),(4,'April'),(5,'May'),(6,'June'),(7,'July'),(8,'August'),(9,'September'),(10,'October'),(11,'November'),(12,'December')] %}<option value="{{n}}">{{name}}</option>{% endfor %}
+            </select>
+            <select name="birth_day" required aria-label="Birth day">
+              <option value="" disabled selected>Day</option>
+              {% for n in range(1,32) %}<option value="{{n}}">{{n}}</option>{% endfor %}
+            </select>
+            <select name="birth_year" required aria-label="Birth year">
+              <option value="" disabled selected>Year</option>
+              {% for n in range(current_year, 1899, -1) %}<option value="{{n}}">{{n}}</option>{% endfor %}
+            </select>
+          </div>
+          <button class="signup-submit" type="submit">Create Account</button>
+        {% else %}
+          <label for="login_username">USERNAME</label>
+          <input id="login_username" name="username" minlength="3" maxlength="20" required autocomplete="username" value="{{ prefill_username|default('') }}" placeholder="Your username">
+          <label for="login_password">PASSWORD</label>
+          <input id="login_password" name="password" type="password" minlength="8" maxlength="128" required autocomplete="current-password" placeholder="Your password">
+          <button class="red-btn full">Log in</button>
+        {% endif %}
+      </form>
+      <p class="auth-switch">{{ 'Already have an account?' if mode=='register' else 'New to HOSTIST?' }} <a href="{{url_for('login' if mode=='register' else 'register')}}">{{'Log in' if mode=='register' else 'Create an account'}}</a></p>
+    </section>
+    {% if mode != 'register' %}<span class="footer-note">HOSTIST COMMUNITY PLATFORM</span>{% endif %}
+  </div>
+  {% if mode == 'register' %}
+  <script>
+    function togglePassword() {
+      const field = document.getElementById('password');
+      const button = document.querySelector('.password-toggle');
+      const showing = field.type === 'password';
+      field.type = showing ? 'text' : 'password';
+      button.setAttribute('aria-pressed', String(showing));
+      button.setAttribute('aria-label', showing ? 'Hide password' : 'Show password');
+    }
+  </script>
+  {% endif %}
+</body>
+</html>
