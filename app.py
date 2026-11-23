@@ -18,11 +18,9 @@ app.config["SECRET_KEY"] = os.environ.get("ABYSS_SECRET", "replace-this-with-a-l
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 app.config["UPLOAD_FOLDER"] = UPLOAD_DIR
 socketio = SocketIO(app, cors_allowed_origins=[], async_mode="threading")
-
-# Active voice sessions are intentionally in-memory for this single-instance starter.
-# Use a shared presence store + Socket.IO message queue before running multiple workers.
-voice_members = {}  # room_key -> {socket sid: {user_id, username}}
-socket_voice_room = {}  # socket sid -> room_key
+# Active voice sessions map Socket.IO connection IDs to authorized room names.
+# This lets signaling verify that peers share the same server VC or DM call.
+active_voice_sessions = {}
 
 def connect():
     c = sqlite3.connect(DB_PATH, timeout=15)
@@ -150,7 +148,7 @@ def login():
                 c.execute("UPDATE users SET status='online' WHERE id=?",(u["id"],))
                 return redirect(url_for("app_home"))
         flash("Incorrect username or password.")
-    return render_template("auth.html", mode="login")
+    return render_template("auth.html", mode="login", prefill_username=request.args.get("username", ""))
 
 @app.route("/logout")
 def logout():
@@ -167,7 +165,9 @@ def app_home():
     sid = request.args.get("server",type=int)
     cid = request.args.get("channel",type=int)
     dm_id = request.args.get("dm",type=int)
-    view = request.args.get("view", "")
+    view = request.args.get("view", "servers")
+    if view not in ("servers", "friends"):
+        view = "servers"
     with connect() as c:
         servers = c.execute("""SELECT s.*,m.role FROM servers s JOIN memberships m ON m.server_id=s.id
                                WHERE m.user_id=? ORDER BY s.id""",(uid,)).fetchall()
@@ -201,18 +201,18 @@ def app_home():
                            JOIN users u ON u.id=other.user_id ORDER BY dc.id DESC""",(uid,uid)).fetchall()
         active_dm = None
         dm_history = []
-        if dm_id and dm_allowed(c,uid,dm_id):
+        if dm_id and not dm_allowed(c,uid,dm_id):
+            dm_id = None
+        if dm_id:
             active_dm = c.execute("""SELECT u.id,u.username,u.avatar,u.status FROM dm_members d
                                      JOIN users u ON u.id=d.user_id WHERE d.conversation_id=? AND d.user_id<>?""",(dm_id,uid)).fetchone()
             dm_history = c.execute("""SELECT m.content,m.created_at,u.username,u.avatar,m.id,m.user_id
                                       FROM dm_messages m JOIN users u ON u.id=m.user_id
                                       WHERE m.conversation_id=? ORDER BY m.id DESC LIMIT 100""",(dm_id,)).fetchall()
             dm_history = list(reversed(dm_history))
-        me = c.execute("SELECT avatar,bio,status FROM users WHERE id=?", (uid,)).fetchone()
     return render_template("app.html",servers=servers,channels=channels,server_id=sid,channel=channel,
                            members=members,history=history,username=session["username"],friends=friends,
-                           pending=pending,dms=dms,dm_id=dm_id,active_dm=active_dm,dm_history=dm_history,
-                           view=view,me=me)
+                           pending=pending,dms=dms,dm_id=dm_id,active_dm=active_dm,dm_history=dm_history,view=view)
 
 @app.post("/servers/create")
 @require_auth
@@ -241,18 +241,6 @@ def join_server():
             return redirect(url_for("app_home",server=s["id"]))
     flash("That invite code is not valid.")
     return redirect(url_for("app_home"))
-
-@app.get("/join/<invite_code>")
-@require_auth
-def join_server_link(invite_code):
-    with connect() as c:
-        server = c.execute("SELECT id FROM servers WHERE invite_code=?", (invite_code,)).fetchone()
-        if not server:
-            flash("That invite link is invalid or has expired.")
-            return redirect(url_for("app_home"))
-        c.execute("INSERT OR IGNORE INTO memberships(user_id,server_id,role,joined_at) VALUES(?,?,?,?)",
-                  (session["uid"], server["id"], "member", now()))
-    return redirect(url_for("app_home", server=server["id"]))
 
 @app.post("/servers/<int:sid>/invite")
 @require_auth
@@ -332,11 +320,6 @@ def open_dm(other_id):
             c.execute("INSERT INTO dm_members(conversation_id,user_id) VALUES(?,?)",(did,other_id))
     return redirect(url_for("app_home",dm=did))
 
-@app.get("/friends")
-@require_auth
-def friends_page():
-    return redirect(url_for("app_home", view="friends"))
-
 @app.post("/profile")
 @require_auth
 def profile():
@@ -364,11 +347,6 @@ def get_invite(sid):
         row=c.execute("SELECT invite_code FROM servers WHERE id=?",(sid,)).fetchone()
         if not row: abort(404)
         return jsonify({"invite":row["invite_code"]})
-
-@socketio.on("connect")
-def ws_connect(auth=None):
-    if logged_in():
-        join_room(f"user:{session['uid']}")
 
 @socketio.on("join_channel")
 def ws_join_channel(data):
@@ -417,81 +395,98 @@ def ws_send_dm(data):
              "user_id":session["uid"],"content":content,"created_at":datetime.utcnow().strftime("%I:%M %p")}
     emit("new_dm",msg,room=f"dm:{did}")
 
-def _voice_room_key(room_type, room_id, uid):
-    room_type = str(room_type or "channel")
-    room_id = int(room_id or 0)
-    with connect() as c:
-        if room_type == "channel":
-            row = c.execute("SELECT server_id,kind FROM channels WHERE id=?", (room_id,)).fetchone()
-            if not row or row["kind"] != "voice" or not is_member(c, uid, row["server_id"]):
-                return None
-            return f"voice:channel:{room_id}"
-        if room_type == "dm" and dm_allowed(c, uid, room_id):
-            return f"voice:dm:{room_id}"
-    return None
-
 @socketio.on("voice_join")
 def voice_join(data):
-    if not logged_in(): return
-    uid = session["uid"]
-    room_key = _voice_room_key(data.get("room_type", "channel"), data.get("room_id", data.get("channel_id", 0)), uid)
-    if not room_key: return
-    # Move this socket out of any previous voice room before joining another.
-    old_room = socket_voice_room.get(request.sid)
-    if old_room:
-        leave_room(old_room)
-        voice_members.get(old_room, {}).pop(request.sid, None)
-        socketio.emit("voice_peer_left", {"sid": request.sid}, room=old_room)
+    if not logged_in() or not isinstance(data, dict):
+        return
+    try:
+        cid = int(data.get("channel_id", 0))
+    except (TypeError, ValueError):
+        return
     with connect() as c:
-        user = c.execute("SELECT username FROM users WHERE id=?", (uid,)).fetchone()
-    existing = [{"sid": sid, "username": info["username"]}
-                for sid, info in voice_members.get(room_key, {}).items()]
-    join_room(room_key)
-    voice_members.setdefault(room_key, {})[request.sid] = {"user_id": uid, "username": user["username"]}
-    socket_voice_room[request.sid] = room_key
-    emit("voice_roster", {"peers": existing, "room": room_key}, to=request.sid)
-    emit("voice_peer", {"sid": request.sid, "username": user["username"]}, room=room_key, include_self=False)
-    emit("voice_presence", {"sid": request.sid, "username": user["username"], "joined": True}, room=room_key)
-    if str(data.get("room_type", "channel")) == "dm":
-        with connect() as c:
-            other_members = c.execute("SELECT user_id FROM dm_members WHERE conversation_id=? AND user_id<>?",
-                                      (int(data.get("room_id", 0)), uid)).fetchall()
-        for member in other_members:
-            socketio.emit("incoming_dm_call", {"conversation_id": int(data.get("room_id", 0)),
-                                                "caller": user["username"]},
-                          room=f"user:{member['user_id']}", skip_sid=request.sid)
+        row = c.execute("SELECT server_id,kind,name FROM channels WHERE id=?", (cid,)).fetchone()
+        if not row or row["kind"] != "voice" or not is_member(c, session["uid"], row["server_id"]):
+            return
+        user = c.execute("SELECT username FROM users WHERE id=?", (session["uid"],)).fetchone()
+    room = f"voice:{cid}"
+    previous = active_voice_sessions.get(request.sid)
+    if previous and previous != room:
+        leave_room(previous)
+        emit("voice_peer_left", {"sid": request.sid}, room=previous)
+    active_voice_sessions[request.sid] = room
+    join_room(room)
+    emit("voice_peer", {"sid": request.sid, "username": user["username"]}, room=room, include_self=False)
+    emit("voice_joined", {"room": room, "name": row["name"], "kind": "channel"})
+
+@socketio.on("dm_call_invite")
+def dm_call_invite(data):
+    if not logged_in() or not isinstance(data, dict):
+        return
+    try:
+        did = int(data.get("dm_id", 0))
+    except (TypeError, ValueError):
+        return
+    with connect() as c:
+        if not dm_allowed(c, session["uid"], did):
+            return
+        user = c.execute("SELECT username FROM users WHERE id=?", (session["uid"],)).fetchone()
+    emit("dm_call_incoming", {"dm_id": did, "username": user["username"]}, room=f"dm:{did}", include_self=False)
+
+@socketio.on("dm_voice_join")
+def dm_voice_join(data):
+    if not logged_in() or not isinstance(data, dict):
+        return
+    try:
+        did = int(data.get("dm_id", 0))
+    except (TypeError, ValueError):
+        return
+    with connect() as c:
+        if not dm_allowed(c, session["uid"], did):
+            return
+        user = c.execute("SELECT username FROM users WHERE id=?", (session["uid"],)).fetchone()
+    room = f"dmvoice:{did}"
+    previous = active_voice_sessions.get(request.sid)
+    if previous and previous != room:
+        leave_room(previous)
+        emit("voice_peer_left", {"sid": request.sid}, room=previous)
+    active_voice_sessions[request.sid] = room
+    join_room(room)
+    emit("voice_peer", {"sid": request.sid, "username": user["username"]}, room=room, include_self=False)
+    emit("voice_joined", {"room": room, "name": "Direct message call", "kind": "dm"})
 
 @socketio.on("voice_leave")
 def voice_leave(data=None):
-    room_key = socket_voice_room.pop(request.sid, None)
-    if not room_key: return
-    leave_room(room_key)
-    voice_members.get(room_key, {}).pop(request.sid, None)
-    emit("voice_peer_left", {"sid": request.sid}, room=room_key)
-    if not voice_members.get(room_key):
-        voice_members.pop(room_key, None)
+    room = active_voice_sessions.pop(request.sid, None)
+    if not room:
+        return
+    leave_room(room)
+    emit("voice_peer_left", {"sid": request.sid}, room=room)
 
 @socketio.on("voice_signal")
 def voice_signal(data):
-    if not logged_in(): return
-    target = data.get("target")
-    room_key = socket_voice_room.get(request.sid)
-    if not target or not room_key or socket_voice_room.get(target) != room_key or "signal" not in data:
+    if not logged_in() or not isinstance(data, dict):
         return
-    socketio.emit("voice_signal", {"from": request.sid, "signal": data["signal"]}, to=target)
+    target = data.get("target")
+    signal = data.get("signal")
+    sender_room = active_voice_sessions.get(request.sid)
+    if not target or not isinstance(signal, dict) or not sender_room:
+        return
+    # Relay only between people in the same authorized voice room.
+    if active_voice_sessions.get(target) != sender_room:
+        return
+    socketio.emit("voice_signal", {"from": request.sid, "signal": signal}, to=target)
 
 @socketio.on("disconnect")
 def ws_disconnect():
-    room_key = socket_voice_room.pop(request.sid, None)
-    if room_key:
-        voice_members.get(room_key, {}).pop(request.sid, None)
-        socketio.emit("voice_peer_left", {"sid": request.sid}, room=room_key)
-        if not voice_members.get(room_key): voice_members.pop(room_key, None)
+    cid = active_voice_sessions.pop(request.sid, None)
+    if cid is not None:
+        emit("voice_peer_left", {"sid": request.sid}, room=cid)
     if logged_in():
         with connect() as c:
-            c.execute("UPDATE users SET status='offline' WHERE id=?",(session["uid"],))
+            c.execute("UPDATE users SET status='offline' WHERE id=?", (session["uid"],))
+    # Socket.IO removes the socket from rooms automatically.
 
 @app.errorhandler(403)
 def forbidden(_): return "You do not have permission to do that.",403
 
-init_db()  # Also runs when imported by a production server such as Gunicorn.\n\nif __name__ == "__main__":\n    socketio.run(app, host="0.0.0.0", port=5000, debug=True, allow_unsafe_werkzeug=True)
+init_db()  # Also runs when imported by a production server such as Gunicorn.\n\nif __name__ == "__main__":\n    socketio.run(app, host="127.0.0.1", port=5000, debug=True, allow_unsafe_werkzeug=True)

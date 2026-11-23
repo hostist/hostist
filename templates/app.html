@@ -1,114 +1,137 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HOSTIST</title>
-<link rel="stylesheet" href="{{url_for('static',filename='style.css')}}">
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HOSTIST</title>
+<link rel="stylesheet" href="{{url_for('static',filename='style.css')}}"><script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body class="layout">
 <aside class="guild-rail">
-  <a class="brand-mark" href="{{url_for('app_home')}}" title="HOSTIST">H</a><div class="rail-divider"></div>
-  <a class="rail-home {{'selected' if view=='friends' else ''}}" href="{{url_for('app_home',view='friends')}}" title="Friends">✦</a>
-  {% for s in servers %}<a class="guild {{'chosen' if s.id==server_id and view!='friends' else ''}}" href="{{url_for('app_home',server=s.id)}}" title="{{s.name}}">{{s.name[:2]|upper}}</a>{% endfor %}
-  <button class="guild add" onclick="document.getElementById('create-server').showModal()" title="Create a server">＋</button>
-  <button class="guild add join" onclick="document.getElementById('join-server').showModal()" title="Join a server">↗</button>
-  <a class="rail-logout" href="{{url_for('logout')}}" title="Log out">⇥</a>
+  <a class="hostist-icon {{'home-selected' if view=='friends' else ''}}" href="{{url_for('app_home',view='friends')}}" title="Home — Friends and DMs">H</a>
+  <div class="rail-line"></div>
+  <a class="rail-nav {{'selected' if view=='servers' else ''}}" href="{{url_for('app_home',view='servers',server=server_id)}}" title="Servers">▦</a>
+  <div class="rail-line"></div>
+  {% for s in servers %}<a class="guild {{'chosen' if s.id==server_id and view=='servers' else ''}}" href="{{url_for('app_home',server=s.id,view='servers')}}" title="{{s.name}}">{{s.name[:2]|upper}}</a>{% endfor %}
+  <button class="guild add" onclick="document.getElementById('create-server').showModal()" title="Create server">+</button>
+  <button class="guild add" onclick="document.getElementById('join-server').showModal()" title="Join server">↗</button>
+  <a class="guild exit" href="{{url_for('logout')}}" title="Log out">⇥</a>
 </aside>
 
 <aside class="side-panel">
-  <header class="server-top">
-    <span>{% if view=='friends' %}Friends{% else %}{{(servers|selectattr('id','equalto',server_id)|first).name}}{% endif %}</span>
-    {% if view!='friends' %}<button title="Server menu / invite" onclick="showInvite()">⌄</button>{% else %}<button title="Add friend" onclick="document.getElementById('add-friend').showModal()">＋</button>{% endif %}
-  </header>
-  <div class="side-scroll">
-    <a class="nav-row {{'active' if view=='friends' else ''}}" href="{{url_for('app_home',view='friends')}}"><span class="nav-icon">♟</span> Friends</a>
-    {% if view!='friends' %}
-      <div class="side-label">TEXT CHANNELS <button onclick="openChannel('text')">＋</button></div>
-      {% for ch in channels if ch.kind=='text' %}<a class="channel {{'active' if ch.id==channel.id and not dm_id else ''}}" href="{{url_for('app_home',server=server_id,channel=ch.id)}}"><span>#</span>{{ch.name}}</a>{% endfor %}
-      <div class="side-label">VOICE CHANNELS <button onclick="openChannel('voice')">＋</button></div>
-      {% for ch in channels if ch.kind=='voice' %}<a class="channel {{'active' if ch.id==channel.id and not dm_id else ''}}" href="{{url_for('app_home',server=server_id,channel=ch.id)}}"><span class="voice-glyph">◖</span>{{ch.name}}</a>{% endfor %}
-    {% endif %}
-    <div class="side-label">DIRECT MESSAGES <button onclick="document.getElementById('add-friend').showModal()">＋</button></div>
-    {% for d in dms %}<a class="channel dm-link {{'active' if dm_id==d.id else ''}}" href="{{url_for('app_home',dm=d.id)}}"><span class="mini-avatar">{{d.username[:1]|upper}}</span>{{d.username}}<i class="presence {{d.status}}"></i></a>{% endfor %}
-    <div class="side-label">FRIENDS <button onclick="document.getElementById('add-friend').showModal()">＋</button></div>
-    {% for f in friends %}<form class="friend-row" method="post" action="{{url_for('open_dm',other_id=f.id)}}"><button class="friend-open"><span class="mini-avatar">{{f.username[:1]|upper}}</span>{{f.username}}</button><i class="presence {{f.status}}"></i></form>{% endfor %}
-    {% if pending %}<div class="side-label">PENDING REQUESTS</div>{% for p in pending %}<form class="pending" method="post" action="{{url_for('accept_friend',fid=p.id)}}"><span>{{p.username}}</span><button class="accept">Accept</button></form>{% endfor %}{% endif %}
+{% if view=='friends' %}
+  <header class="server-top"><span>Friends</span><button class="invite-mini" onclick="document.getElementById('add-friend').showModal()">＋</button></header>
+  <div class="side-scroll friends-sidebar">
+    <input class="sidebar-search" id="friend-search" placeholder="Find or start a conversation" autocomplete="off">
+    <a class="friend-nav-item active" href="{{url_for('app_home',view='friends')}}"><span>♟</span> Friends</a>
+    <button class="friend-nav-item" type="button" onclick="document.getElementById('requests-panel').scrollIntoView({behavior:'smooth'})"><span>✉</span> Message Requests {% if pending %}<b class="nav-count">{{pending|length}}</b>{% endif %}</button>
+    <div class="friend-shortcuts"><span>DIRECT MESSAGES</span><button onclick="document.getElementById('add-friend').showModal()" title="Start a DM">＋</button></div>
+    {% for d in dms %}<a class="dm-row searchable {{'active' if dm_id==d.id else ''}}" data-search="{{d.username|lower}}" href="{{url_for('app_home',dm=d.id,view='friends')}}"><span class="mini-avatar">{{d.username[:1]|upper}}</span><span class="dm-name">{{d.username}}</span><i class="presence {{d.status}}"></i></a>{% else %}<p class="empty-side">Your direct messages will appear here.</p>{% endfor %}
+    <div id="requests-panel" class="friend-shortcuts request-heading"><span>MESSAGE REQUESTS</span></div>
+    {% for p in pending %}<form class="pending searchable" data-search="{{p.username|lower}}" method="post" action="{{url_for('accept_friend',fid=p.id)}}"><span>{{p.username}}</span><button class="accept">Accept</button></form>{% else %}<p class="empty-side">No new requests.</p>{% endfor %}
   </div>
-  <footer class="user-bar">
-    <button class="user-avatar" onclick="document.getElementById('profile-modal').showModal()">{{username[:1]|upper}}</button>
-    <div class="user-label"><b>{{username}}</b><small>Online</small></div>
-    <button class="control-btn" id="mic-btn" title="Mute microphone" onclick="toggleMute()">🎙</button>
-    <button class="control-btn" id="deafen-btn" title="Deafen" onclick="toggleDeafen()">🎧</button>
-    <button class="control-btn" title="Edit profile" onclick="document.getElementById('profile-modal').showModal()">⚙</button>
-  </footer>
+{% else %}
+  <header class="server-top"><span>{{(servers|selectattr('id','equalto',server_id)|first).name}}</span><button title="Server invite" onclick="showInvite()">⌄</button></header>
+  <div class="side-scroll">
+    <div class="side-label">TEXT CHANNELS <button onclick="openChannel('text')">＋</button></div>
+    {% for ch in channels if ch.kind=='text' %}<a class="channel {{'active' if ch.id==channel.id and not dm_id else ''}}" href="{{url_for('app_home',server=server_id,channel=ch.id,view='servers')}}"><span>#</span>{{ch.name}}</a>{% endfor %}
+    <div class="side-label">VOICE CHANNELS <button onclick="openChannel('voice')">＋</button></div>
+    {% for ch in channels if ch.kind=='voice' %}<button class="channel voice-link" onclick="joinVoice({{ch.id}},{{ch.name|tojson}})"><span>◖</span>{{ch.name}}</button>{% endfor %}
+    <div class="server-sidebar-actions"><button onclick="showInvite()">＋ Invite people</button><button onclick="document.getElementById('join-server').showModal()">↗ Join another server</button></div>
+  </div>
+{% endif %}
+<div class="account-menu" id="account-menu" hidden>
+  <div class="profile-popover-cover"></div>
+  <div class="profile-popover-user"><span class="user-avatar">{{username[:1]|upper}}</span><div><b>{{username}}</b><small>@{{username}}</small></div></div>
+  <div class="profile-popover-bio">Welcome to HOSTIST.</div>
+  <div class="account-menu-heading">ACCOUNT</div>
+  <button class="account-menu-item" type="button" onclick="showSavedAccounts()">⇄ <span>Switch account</span><span class="menu-chevron">›</span></button>
+  <div class="saved-accounts" id="saved-accounts" hidden></div>
+  <button class="account-menu-item" type="button" onclick="location.href='{{url_for('login')}}'">＋ <span>Add an account</span></button>
+  <a class="account-menu-item logout-item" href="{{url_for('logout')}}">↪ <span>Log out</span></a>
+</div>
+<footer class="user-bar">
+  <button class="account-trigger" type="button" onclick="toggleAccountMenu()" aria-haspopup="true" aria-expanded="false" id="account-trigger">
+    <span class="user-avatar">{{username[:1]|upper}}</span><span class="user-label"><b>{{username}}</b><small>Online</small></span><span class="account-chevron">⌃</span>
+  </button>
+  <button class="profile-settings" title="Edit profile" onclick="document.getElementById('profile-modal').showModal()">⚙</button>
+</footer>
 </aside>
 
 <main class="conversation">
-{% if view=='friends' %}
-  <header class="chat-top"><span class="top-symbol">♟</span><b>Friends</b><button class="top-action" onclick="document.getElementById('add-friend').showModal()">Add Friend</button></header>
-  <section class="friends-page">
-    <div class="friends-heading"><div><h1>Friends</h1><p>Keep up with your people and start a conversation.</p></div><button class="primary-btn" onclick="document.getElementById('add-friend').showModal()">＋ Add Friend</button></div>
-    {% if pending %}<h3>Friend Requests</h3>{% for p in pending %}<div class="friend-card"><div class="mini-avatar large">{{p.username[:1]|upper}}</div><div class="friend-info"><b>{{p.username}}</b><small>Incoming friend request</small></div><form method="post" action="{{url_for('accept_friend',fid=p.id)}}"><button class="primary-btn">Accept</button></form></div>{% endfor %}{% endif %}
-    <h3>All Friends · {{friends|length}}</h3>
-    {% for f in friends %}<div class="friend-card"><div class="mini-avatar large">{{f.username[:1]|upper}}</div><div class="friend-info"><b>{{f.username}}</b><small><i class="presence {{f.status}}"></i> {{f.status|title}}</small></div><form method="post" action="{{url_for('open_dm',other_id=f.id)}}"><button class="secondary-btn">Message</button></form></div>{% else %}<div class="empty-state"><div class="empty-icon">♟</div><h2>No friends yet</h2><p>Add someone by their HOSTIST username to start chatting.</p><button class="primary-btn" onclick="document.getElementById('add-friend').showModal()">Add a friend</button></div>{% endfor %}
-  </section>
-{% elif dm_id and active_dm %}
-  <header class="chat-top"><span class="mini-avatar">{{active_dm.username[:1]|upper}}</span><b>{{active_dm.username}}</b><span class="topic">Direct message</span><button class="call-btn" onclick="startVoice('dm',DM_ID,'Call with {{active_dm.username|e}}')">☎ Start call</button></header>
+{% if dm_id and active_dm %}
+  <header class="chat-top"><span class="mini-avatar">{{active_dm.username[:1]|upper}}</span><div class="chat-heading"><b>{{active_dm.username}}</b><small><i class="presence {{active_dm.status}}"></i> {{active_dm.status|title}}</small></div><span class="topic">Direct message</span><button class="call-action" onclick="startDmCall({{dm_id}},{{active_dm.username|tojson}})" title="Start voice call">☎ <span>Call</span></button></header>
   <section class="chat-feed" id="feed"><div class="intro"><div class="intro-symbol">✉</div><h2>{{active_dm.username}}</h2><p>This is the beginning of your direct message history.</p></div>
   {% for m in dm_history %}<article class="message"><div class="msg-avatar">{{m.username[:1]|upper}}</div><div><div class="msg-head"><b>{{m.username}}</b><time>{{m.created_at}}</time></div><p>{{m.content}}</p></div></article>{% endfor %}</section>
-  <form class="message-box" id="dm-form"><span>＋</span><input id="dm-input" placeholder="Message @{{active_dm.username}}" maxlength="2000" autocomplete="off"><button aria-label="Send message">➤</button></form>
+  <form class="message-box" id="dm-form"><span>＋</span><input id="dm-input" placeholder="Message @{{active_dm.username}}" maxlength="2000" autocomplete="off"><button>➤</button></form>
+{% elif view=='friends' %}
+  <header class="chat-top friends-toolbar"><span class="friends-toolbar-title">♟ <b>Friends</b></span><span class="toolbar-dot">•</span><a class="friends-tab active" href="{{url_for('app_home',view='friends')}}">All</a><button class="discord-add" onclick="document.getElementById('add-friend').showModal()">Add Friend</button></header>
+  <section class="friends-content"><div class="friends-main">
+    <div class="friends-empty-state">{% if friends %}<h2>All Friends · {{friends|length}}</h2><div class="friends-grid">{% for f in friends %}<form class="friend-card" method="post" action="{{url_for('open_dm',other_id=f.id)}}"><span class="mini-avatar">{{f.username[:1]|upper}}</span><span class="friend-card-name"><b>{{f.username}}</b><small><i class="presence {{f.status}}"></i>{{f.status|title}}</small></span><button class="gray-btn">Message</button></form>{% endfor %}</div>{% else %}<div class="empty-friends-icon">♟</div><p>There are no friends online at this time. Check back later!</p>{% endif %}</div>
+  </div><aside class="active-now"><h3>Active Now</h3>{% set online_friends = friends|selectattr('status','equalto','online')|list %}{% if online_friends %}{% for f in online_friends %}<form method="post" action="{{url_for('open_dm',other_id=f.id)}}" class="active-friend"><span class="mini-avatar">{{f.username[:1]|upper}}</span><span><b>{{f.username}}</b><small>Online</small></span><button aria-label="Message {{f.username}}">✉</button></form>{% endfor %}{% else %}<div class="active-empty"><b>It's quiet for now...</b><p>When a friend starts an activity, we'll show it here.</p></div>{% endif %}</aside></section>
 {% elif channel.kind=='text' %}
-  <header class="chat-top"><span class="channel-hash">#</span><b>{{channel.name}}</b><span class="topic">Welcome to {{channel.name}}</span><button class="top-action" onclick="showInvite()">Invite People</button></header>
+  <header class="chat-top"><span class="channel-hash">#</span><b>{{channel.name}}</b><span class="topic">Welcome to {{channel.name}}</span><button class="top-action" onclick="document.getElementById('add-friend').showModal()">Add friend</button></header>
   <section class="chat-feed" id="feed"><div class="intro"><div class="intro-symbol">#</div><h2>Welcome to #{{channel.name}}</h2><p>This is the beginning of this channel. Say hello.</p></div>
   {% for m in history %}<article class="message"><div class="msg-avatar">{{m.username[:1]|upper}}</div><div><div class="msg-head"><b>{{m.username}}</b><time>{{m.created_at}}</time></div><p>{{m.content}}</p></div></article>{% endfor %}</section>
-  <form class="message-box" id="channel-form"><span>＋</span><input id="channel-input" placeholder="Message #{{channel.name}}" maxlength="2000" autocomplete="off"><button aria-label="Send message">➤</button></form>
+  <form class="message-box" id="channel-form"><span>＋</span><input id="channel-input" placeholder="Message #{{channel.name}}" maxlength="2000" autocomplete="off"><button>➤</button></form>
 {% else %}
   <header class="chat-top"><span class="channel-hash">◖</span><b>{{channel.name}}</b><span class="topic">Voice channel</span></header>
-  <section class="voice-stage"><div class="voice-orb">◖</div><h2>{{channel.name}}</h2><p>Join this voice channel to talk with your community.</p><div id="voice-status" class="voice-status">Not connected</div><div id="voice-peers" class="voice-peers"></div><div class="voice-controls"><button class="primary-btn" id="join-voice-btn" onclick="startVoice('channel',CHANNEL_ID,'{{channel.name|e}}')">Join Voice</button><button class="voice-control" id="voice-mic" onclick="toggleMute()" disabled>🎙 Mute</button><button class="voice-control" id="voice-deafen" onclick="toggleDeafen()" disabled>🎧 Deafen</button><button class="leave-btn" id="leave-voice" onclick="leaveVoice()" disabled>☎ Leave</button></div></section>
+  <section class="voice-stage"><div class="voice-orb">◖</div><h2>{{channel.name}}</h2><p>Join this voice room to talk with your community.</p><button class="red-btn" onclick="joinVoice({{channel.id}},{{channel.name|tojson}})">Join voice</button><div id="voice-status" class="voice-status">Not connected</div><div id="voice-peers" class="voice-peers"></div></section>
 {% endif %}
 </main>
 
-{% if view!='friends' and not dm_id %}<aside class="member-panel"><div class="member-title">MEMBERS — {{members|length}}</div>{% for m in members %}<div class="member-item"><div class="mini-avatar">{{m.username[:1]|upper}}</div><span>{{m.username}}</span><small class="role">{{m.role}}</small><i class="presence {{m.status}}"></i></div>{% endfor %}</aside>{% elif dm_id %}<aside class="member-panel dm-side"><div class="member-title">DIRECT MESSAGE</div><div class="dm-profile"><div class="mini-avatar profile-avatar">{{active_dm.username[:1]|upper}}</div><h3>{{active_dm.username}}</h3><p>{{active_dm.status|title}}</p><button class="secondary-btn" onclick="startVoice('dm',DM_ID,'Call with {{active_dm.username|e}}')">☎ Call</button></div></aside>{% endif %}
+{% if view=='servers' and not dm_id %}<aside class="member-panel"><div class="member-title">MEMBERS — {{members|length}}</div>{% for m in members %}<div class="member-item"><div class="mini-avatar">{{m.username[:1]|upper}}</div><span>{{m.username}}</span><small class="role">{{m.role}}</small><i class="presence {{m.status}}"></i></div>{% endfor %}</aside>{% endif %}
 
-<dialog id="create-server"><form method="post" action="{{url_for('create_server')}}"><h2>Create a server</h2><p class="modal-hint">Start a place for your community.</p><label>SERVER NAME</label><input name="name" maxlength="32" required placeholder="My community"><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="primary-btn">Create Server</button></div></form></dialog>
-<dialog id="join-server"><form method="post" action="{{url_for('join_server')}}"><h2>Join a server</h2><label>INVITE CODE</label><input name="invite" required placeholder="Paste an HOSTIST invite code"><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="primary-btn">Join Server</button></div></form></dialog>
-<dialog id="create-channel"><form method="post" action="{{url_for('create_channel')}}"><h2>Create a channel</h2><input type="hidden" name="server_id" value="{{server_id}}"><input type="hidden" id="channel-kind" name="kind" value="text"><label>CHANNEL NAME</label><input name="name" maxlength="32" required placeholder="new-channel"><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="primary-btn">Create Channel</button></div></form></dialog>
-<dialog id="add-friend"><form method="post" action="{{url_for('friend_request')}}"><h2>Add a friend</h2><p class="modal-hint">Enter their exact HOSTIST username.</p><label>USERNAME</label><input name="username" required placeholder="username"><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="primary-btn">Send Request</button></div></form></dialog>
-<dialog id="profile-modal"><form method="post" action="{{url_for('profile')}}" enctype="multipart/form-data"><h2>Your profile</h2><label>PROFILE PICTURE</label><input type="file" name="avatar" accept="image/png,image/jpeg,image/gif,image/webp"><label>ABOUT ME</label><textarea name="bio" maxlength="160" placeholder="A little about yourself">{{me.bio or ''}}</textarea><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="primary-btn">Save Profile</button></div></form></dialog>
-<div id="voice-dock" class="voice-dock" hidden><div class="voice-dock-info"><span class="voice-live-dot"></span><div><b id="voice-dock-title">Voice connected</b><small id="voice-dock-subtitle">Connected</small></div></div><button class="voice-dock-btn" id="dock-mic" onclick="toggleMute()" title="Mute">🎙</button><button class="voice-dock-btn" id="dock-deafen" onclick="toggleDeafen()" title="Deafen">🎧</button><button class="voice-dock-leave" onclick="leaveVoice()">☎ Leave</button></div>
+<div class="voice-dock" id="voice-dock" aria-live="polite">
+  <div class="voice-dock-info"><span class="voice-live-dot"></span><div><b id="voice-dock-title">In Voice</b><small id="voice-dock-subtitle">Connecting…</small></div></div>
+  <div class="voice-dock-people" id="voice-dock-people"><span class="voice-person">{{username[:1]|upper}}</span></div>
+  <div class="voice-controls"><button id="mute-btn" class="voice-control" onclick="toggleMute()" title="Mute microphone">🎙 Mute</button><button id="deafen-btn" class="voice-control" onclick="toggleDeafen()" title="Deafen">🎧 Deafen</button><button class="voice-control leave-call" onclick="leaveVoice()" title="Leave call">☎ Leave</button></div>
+</div>
+
+<dialog id="create-server"><form method="post" action="{{url_for('create_server')}}"><h2>Create a server</h2><label>SERVER NAME</label><input name="name" maxlength="32" required placeholder="My community"><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="red-btn">Create</button></div></form></dialog>
+<dialog id="join-server"><form method="post" action="{{url_for('join_server')}}"><h2>Join a server</h2><label>INVITE CODE</label><input name="invite" required placeholder="Paste a HOSTIST invite code"><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="red-btn">Join</button></div></form></dialog>
+<dialog id="create-channel"><form method="post" action="{{url_for('create_channel')}}"><h2>Create a channel</h2><input type="hidden" name="server_id" value="{{server_id}}"><input type="hidden" id="channel-kind" name="kind" value="text"><label>CHANNEL NAME</label><input name="name" maxlength="32" required placeholder="new-channel"><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="red-btn">Create</button></div></form></dialog>
+<dialog id="add-friend"><form method="post" action="{{url_for('friend_request')}}"><h2>Add a friend</h2><p class="modal-hint">Enter their exact HOSTIST username.</p><label>USERNAME</label><input name="username" required placeholder="username"><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="red-btn">Send request</button></div></form></dialog>
+<dialog id="profile-modal"><form method="post" action="{{url_for('profile')}}" enctype="multipart/form-data"><h2>Your profile</h2><label>PROFILE PICTURE</label><input type="file" name="avatar" accept="image/png,image/jpeg,image/gif,image/webp"><label>ABOUT ME</label><textarea name="bio" maxlength="160" placeholder="A little about yourself"></textarea><div class="modal-buttons"><button type="button" class="gray-btn" onclick="this.closest('dialog').close()">Cancel</button><button class="red-btn">Save</button></div></form></dialog>
 <div id="toast" class="toast"></div>
 <script>
 const socket=io();
-const SERVER_ID={{server_id|tojson}}, CHANNEL_ID={{channel.id|tojson}}, CHANNEL_KIND={{channel.kind|tojson}}, DM_ID={{(dm_id or 0)|tojson}}, VIEW={{view|tojson}};
+const ACCOUNT_USERNAME={{username|tojson}};
+const ACCOUNT_STORAGE_KEY='hostist.savedAccounts.v1';
+function savedAccountNames(){try{return JSON.parse(localStorage.getItem(ACCOUNT_STORAGE_KEY)||'[]')}catch(e){return []}}
+function rememberCurrentAccount(){const names=savedAccountNames().filter(n=>typeof n==='string'&&n!==ACCOUNT_USERNAME);names.unshift(ACCOUNT_USERNAME);localStorage.setItem(ACCOUNT_STORAGE_KEY,JSON.stringify(names.slice(0,8)))}
+function toggleAccountMenu(){const menu=document.getElementById('account-menu');const trigger=document.getElementById('account-trigger');const open=menu.hidden;menu.hidden=!open;trigger.setAttribute('aria-expanded',String(open));if(!open)document.getElementById('saved-accounts').hidden=true}
+function showSavedAccounts(){const box=document.getElementById('saved-accounts');box.innerHTML='';const names=savedAccountNames().filter(n=>n!==ACCOUNT_USERNAME);if(!names.length){const empty=document.createElement('div');empty.className='saved-empty';empty.textContent='No other accounts saved on this device.';box.append(empty)}else{names.forEach(name=>{const b=document.createElement('button');b.type='button';b.className='saved-account';const avatar=document.createElement('span');avatar.className='saved-avatar';avatar.textContent=name.slice(0,1).toUpperCase();const label=document.createElement('span');label.textContent=name;b.append(avatar,label);b.addEventListener('click',()=>{location.href='/login?username='+encodeURIComponent(name)});box.append(b)})}box.hidden=false}
+rememberCurrentAccount();
+document.addEventListener('click',e=>{const menu=document.getElementById('account-menu');const trigger=document.getElementById('account-trigger');if(menu&&!menu.hidden&&!menu.contains(e.target)&&!trigger.contains(e.target)){menu.hidden=true;trigger.setAttribute('aria-expanded','false')}});
+
+const SERVER_ID={{server_id|tojson}}, CHANNEL_ID={{channel.id|tojson}}, CHANNEL_KIND={{channel.kind|tojson}}, DM_ID={{(dm_id or 0)|tojson}};
 const feed=document.getElementById('feed');
 function scrollFeed(){if(feed)feed.scrollTop=feed.scrollHeight}
-function toast(t){const el=document.getElementById('toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3000)}
+function toast(t){const el=document.getElementById('toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2800)}
 function addMsg(m){if(!feed)return;const art=document.createElement('article');art.className='message';const av=document.createElement('div');av.className='msg-avatar';av.textContent=(m.username||'?')[0].toUpperCase();const wrap=document.createElement('div');const head=document.createElement('div');head.className='msg-head';const b=document.createElement('b');b.textContent=m.username;const time=document.createElement('time');time.textContent=m.created_at;head.append(b,time);const p=document.createElement('p');p.textContent=m.content;wrap.append(head,p);art.append(av,wrap);feed.append(art);scrollFeed()}
 if(DM_ID){socket.emit('join_dm',{dm_id:DM_ID});socket.on('new_dm',addMsg);const form=document.getElementById('dm-form');if(form)form.addEventListener('submit',e=>{e.preventDefault();const input=document.getElementById('dm-input');if(input.value.trim()){socket.emit('send_dm',{dm_id:DM_ID,content:input.value.trim()});input.value=''}})}
-else if(CHANNEL_KIND==='text' && VIEW!=='friends'){socket.emit('join_channel',{channel_id:CHANNEL_ID});socket.on('new_message',addMsg);const form=document.getElementById('channel-form');if(form)form.addEventListener('submit',e=>{e.preventDefault();const input=document.getElementById('channel-input');if(input.value.trim()){socket.emit('send_message',{channel_id:CHANNEL_ID,content:input.value.trim()});input.value=''}})}
+else if(CHANNEL_KIND==='text' && {{'true' if view=='servers' else 'false'}}){socket.emit('join_channel',{channel_id:CHANNEL_ID});socket.on('new_message',addMsg);const form=document.getElementById('channel-form');if(form)form.addEventListener('submit',e=>{e.preventDefault();const input=document.getElementById('channel-input');if(input.value.trim()){socket.emit('send_message',{channel_id:CHANNEL_ID,content:input.value.trim()});input.value=''}})}
 scrollFeed();
 function openChannel(kind){document.getElementById('channel-kind').value=kind;document.getElementById('create-channel').showModal()}
-async function showInvite(){try{const r=await fetch(`/api/servers/${SERVER_ID}/invite`);if(!r.ok)throw Error();const d=await r.json();const invite=`${location.origin}/join/${d.invite}`;prompt('Copy this invite link and send it to friends:',invite)}catch(e){toast('Only server owners and admins can create invites.') }}
-
-let voiceRoom=null, localStream=null, peers={}, peerNames={}, muted=false, deafened=false;
-const audioElements={};
-function setVoiceButtons(connected){['voice-mic','voice-deafen','leave-voice'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=!connected});const join=document.getElementById('join-voice-btn');if(join){join.disabled=connected;join.textContent=connected?'Connected':'Join Voice'};const dock=document.getElementById('voice-dock');if(dock)dock.hidden=!connected;updateControlLabels()}
-function updateControlLabels(){const mic=document.getElementById('voice-mic'),deaf=document.getElementById('voice-deafen'),micBar=document.getElementById('mic-btn'),deafBar=document.getElementById('deafen-btn');if(mic)mic.textContent=muted?'🔇 Unmute':'🎙 Mute';if(deaf)deaf.textContent=deafened?'🔈 Undeafen':'🎧 Deafen';if(micBar){micBar.textContent=muted?'🔇':'🎙';micBar.classList.toggle('control-active',muted)}if(deafBar){deafBar.textContent=deafened?'🔈':'🎧';deafBar.classList.toggle('control-active',deafened)}const dm=document.getElementById('dock-mic'),dd=document.getElementById('dock-deafen');if(dm)dm.textContent=muted?'🔇':'🎙';if(dd)dd.textContent=deafened?'🔈':'🎧'}
-async function startVoice(roomType,roomId,label){if(voiceRoom){if(voiceRoom.type===roomType&&voiceRoom.id===roomId){toast('You are already connected.');return}leaveVoice()}
-try{if(!navigator.mediaDevices?.getUserMedia)throw Error('Microphone access requires HTTPS or localhost.');localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});voiceRoom={type:roomType,id:roomId,label};const dockTitle=document.getElementById('voice-dock-title'),dockSub=document.getElementById('voice-dock-subtitle');if(dockTitle)dockTitle.textContent=label;if(dockSub)dockSub.textContent='Voice connected';muted=false;deafened=false;localStream.getAudioTracks().forEach(t=>t.enabled=true);socket.emit('voice_join',{room_type:roomType,room_id:roomId});const status=document.getElementById('voice-status');if(status)status.textContent='Connected to '+label;setVoiceButtons(true);updateControlLabels();toast('Joined '+label)}catch(e){toast(e.message||'Microphone permission was blocked. Use HTTPS and allow microphone access.');if(localStream)localStream.getTracks().forEach(t=>t.stop());localStream=null}}
-function createPeer(sid,initiator){if(peers[sid])return peers[sid];const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]});pc._pendingCandidates=[];peers[sid]=pc;localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));pc.onicecandidate=e=>{if(e.candidate)socket.emit('voice_signal',{target:sid,signal:{candidate:e.candidate}})};pc.ontrack=e=>{let audio=audioElements[sid];if(!audio){audio=document.createElement('audio');audio.autoplay=true;audio.playsInline=true;audio.id='voice-audio-'+sid;document.body.appendChild(audio);audioElements[sid]=audio}audio.srcObject=e.streams[0];audio.muted=deafened;audio.play().catch(()=>toast('Click the page once to enable incoming audio.'))};pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState))removePeer(sid)};if(initiator){pc.createOffer().then(offer=>pc.setLocalDescription(offer)).then(()=>socket.emit('voice_signal',{target:sid,signal:{description:pc.localDescription}})).catch(console.error)}return pc}
-function removePeer(sid){delete peerNames[sid];if(peers[sid]){peers[sid].ontrack=null;peers[sid].close();delete peers[sid]}if(audioElements[sid]){audioElements[sid].srcObject=null;audioElements[sid].remove();delete audioElements[sid]}renderPeers()}
-function renderPeers(){const box=document.getElementById('voice-peers');if(!box)return;box.innerHTML=`<span class="voice-pill">You${muted?' · Muted':''}</span>`;for(const sid of Object.keys(peers)){const pill=document.createElement('span');pill.className='voice-pill';pill.textContent=peerNames[sid]||'Connected participant';box.appendChild(pill)}const sub=document.getElementById('voice-dock-subtitle');if(sub&&voiceRoom)sub.textContent=`Voice connected · ${Object.keys(peers).length+1} here`}
-socket.on('voice_roster',d=>{(d.peers||[]).forEach(p=>{peerNames[p.sid]=p.username;createPeer(p.sid,false)});renderPeers()});
-socket.on('voice_peer',p=>{if(localStream){peerNames[p.sid]=p.username;createPeer(p.sid,true);renderPeers()}});
-socket.on('voice_signal',async d=>{if(!localStream)return;const pc=createPeer(d.from,false);try{if(d.signal.description){await pc.setRemoteDescription(d.signal.description);for(const candidate of pc._pendingCandidates.splice(0))await pc.addIceCandidate(candidate);if(d.signal.description.type==='offer'){const answer=await pc.createAnswer();await pc.setLocalDescription(answer);socket.emit('voice_signal',{target:d.from,signal:{description:pc.localDescription}})}}else if(d.signal.candidate){if(pc.remoteDescription)await pc.addIceCandidate(d.signal.candidate);else pc._pendingCandidates.push(d.signal.candidate)}}catch(e){console.error('Voice signaling error',e)}});
-socket.on('voice_peer_left',d=>removePeer(d.sid));
-socket.on('voice_presence',renderPeers);
-socket.on('incoming_dm_call',d=>{const accepted=window.confirm(`${d.caller} is calling you on HOSTIST. Accept the call?`);if(accepted)startVoice('dm',d.conversation_id,`Call with ${d.caller}`)});
-function toggleMute(){if(!localStream){toast('Join a voice chat first.');return}if(deafened){toast('Undeafen before unmuting.');return}muted=!muted;localStream.getAudioTracks().forEach(t=>t.enabled=!muted||deafened);if(deafened)localStream.getAudioTracks().forEach(t=>t.enabled=false);updateControlLabels();renderPeers()}
-function toggleDeafen(){if(!localStream){toast('Join a voice chat first.');return}deafened=!deafened;if(deafened)muted=true;localStream.getAudioTracks().forEach(t=>t.enabled=!muted);Object.values(audioElements).forEach(a=>a.muted=deafened);updateControlLabels();renderPeers()}
-function leaveVoice(){if(!voiceRoom&&!localStream)return;socket.emit('voice_leave',{});Object.keys(peers).forEach(removePeer);Object.values(audioElements).forEach(a=>a.remove());Object.keys(audioElements).forEach(k=>delete audioElements[k]);peerNames={};if(localStream)localStream.getTracks().forEach(t=>t.stop());localStream=null;voiceRoom=null;muted=false;deafened=false;const status=document.getElementById('voice-status');if(status)status.textContent='Not connected';const box=document.getElementById('voice-peers');if(box)box.innerHTML='';setVoiceButtons(false);updateControlLabels()}
-window.addEventListener('beforeunload',()=>{if(voiceRoom)socket.emit('voice_leave',{})});
+async function showInvite(){try{const r=await fetch(`/api/servers/${SERVER_ID}/invite`);if(!r.ok)throw 0;const d=await r.json();prompt('Share this invite code:',d.invite)}catch(e){toast('Only server owners and admins can create invites.')}}
+let voiceRoom=null, voiceLabel='', localStream=null, peers={}, muted=false, deafened=false, peerNames={};
+const dock=document.getElementById('voice-dock');
+function setDock(on){dock.classList.toggle('visible',!!on);document.getElementById('voice-dock-title').textContent=on?'In Voice':'In Voice';document.getElementById('voice-dock-subtitle').textContent=voiceLabel||'Voice channel'}
+function renderVoicePeople(){const box=document.getElementById('voice-dock-people');box.innerHTML='';const self=document.createElement('span');self.className='voice-person';self.textContent={{username[:1]|upper|tojson}};self.title='You';box.append(self);Object.values(peerNames).forEach(n=>{const p=document.createElement('span');p.className='voice-person';p.textContent=(n||'?')[0].toUpperCase();p.title=n;box.append(p)})}
+async function beginVoice(label){try{localStream=await navigator.mediaDevices.getUserMedia({audio:true});voiceLabel=label;muted=false;deafened=false;setDock(true);renderVoicePeople();updateVoiceButtons();return true}catch(e){toast('Microphone access was blocked. Use HTTPS and allow microphone access.');return false}}
+async function joinVoice(cid,name){const room='voice:'+cid;if(voiceRoom===room){leaveVoice();return}if(voiceRoom)leaveVoice();if(!await beginVoice(name))return;voiceRoom=room;socket.emit('voice_join',{channel_id:cid});const s=document.getElementById('voice-status');if(s)s.textContent='Connected to '+name;const b=document.getElementById('voice-peers');if(b)b.innerHTML='<span class="voice-pill">You · Mic on</span>';toast('Joined voice: '+name)}
+async function startDmCall(did,name){const room='dmvoice:'+did;if(voiceRoom===room){toast('You are already in this call.');return}if(voiceRoom)leaveVoice();if(!await beginVoice('DM call · '+name))return;voiceRoom=room;socket.emit('dm_voice_join',{dm_id:did});socket.emit('dm_call_invite',{dm_id:did});toast('Calling '+name+'…')}
+function updateVoiceButtons(){const m=document.getElementById('mute-btn'),d=document.getElementById('deafen-btn');if(m){m.classList.toggle('is-on',muted);m.textContent=muted?'🔇 Unmute':'🎙 Mute'}if(d){d.classList.toggle('is-on',deafened);d.textContent=deafened?'🔈 Undeafen':'🎧 Deafen'}}
+function toggleMute(){if(!localStream)return;muted=!muted;localStream.getAudioTracks().forEach(t=>t.enabled=!muted&&!deafened);updateVoiceButtons()}
+function toggleDeafen(){if(!localStream)return;deafened=!deafened;localStream.getAudioTracks().forEach(t=>t.enabled=!muted&&!deafened);document.querySelectorAll('audio[id^="audio-"]').forEach(a=>a.muted=deafened);updateVoiceButtons()}
+function closePeer(sid){if(peers[sid]){peers[sid].close();delete peers[sid]}delete peerNames[sid];const a=document.getElementById('audio-'+sid);if(a)a.remove();renderVoicePeople()}
+function leaveVoice(){if(voiceRoom)socket.emit('voice_leave');Object.keys(peers).forEach(closePeer);peers={};peerNames={};if(localStream)localStream.getTracks().forEach(t=>t.stop());localStream=null;voiceRoom=null;voiceLabel='';muted=false;deafened=false;setDock(false);updateVoiceButtons();const s=document.getElementById('voice-status');if(s)s.textContent='Not connected';const b=document.getElementById('voice-peers');if(b)b.innerHTML='';document.querySelectorAll('audio[id^="audio-"]').forEach(a=>a.remove())}
+function makePeer(sid){const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});peers[sid]=pc;if(localStream)localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));pc.onicecandidate=e=>{if(e.candidate)socket.emit('voice_signal',{target:sid,signal:{candidate:e.candidate}})};pc.ontrack=e=>{let audio=document.getElementById('audio-'+sid);if(!audio){audio=document.createElement('audio');audio.id='audio-'+sid;audio.autoplay=true;document.body.append(audio)}audio.srcObject=e.streams[0];audio.muted=deafened};return pc}
+socket.on('dm_call_incoming',async d=>{if(!DM_ID||d.dm_id!==DM_ID||voiceRoom)return;const accepted=confirm(d.username+' is calling you. Join the voice call?');if(!accepted)return;if(!await beginVoice('DM call · '+d.username))return;voiceRoom='dmvoice:'+d.dm_id;socket.emit('dm_voice_join',{dm_id:d.dm_id});toast('Joined call with '+d.username)});
+socket.on('voice_peer',async peer=>{if(!localStream)return;peerNames[peer.sid]=peer.username||'Member';renderVoicePeople();const pc=makePeer(peer.sid);try{const offer=await pc.createOffer();await pc.setLocalDescription(offer);socket.emit('voice_signal',{target:peer.sid,signal:{description:pc.localDescription}})}catch(e){console.error(e)}});
+socket.on('voice_signal',async d=>{if(!localStream)return;let pc=peers[d.from];if(!pc){peerNames[d.from]='Member';renderVoicePeople();pc=makePeer(d.from)}try{if(d.signal.description){await pc.setRemoteDescription(d.signal.description);if(d.signal.description.type==='offer'){const answer=await pc.createAnswer();await pc.setLocalDescription(answer);socket.emit('voice_signal',{target:d.from,signal:{description:pc.localDescription}})}}else if(d.signal.candidate)await pc.addIceCandidate(d.signal.candidate)}catch(e){console.error(e)}});
+socket.on('voice_joined',d=>{if(d&&d.name){voiceLabel=(d.kind==='dm'?'DM call · ':'')+d.name;setDock(true)}});
+socket.on('voice_peer_left',d=>closePeer(d.sid));
+window.addEventListener('beforeunload',()=>{if(voiceRoom)socket.emit('voice_leave')});
+const search=document.getElementById('friend-search');if(search)search.addEventListener('input',()=>{const q=search.value.toLowerCase();document.querySelectorAll('.searchable').forEach(el=>el.style.display=el.dataset.search.includes(q)?'':'none')});
 </script>
 </body></html>

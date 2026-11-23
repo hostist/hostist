@@ -1,21 +1,6 @@
 # HOSTIST
 
-HOSTIST is a Discord-inspired community chat app built with Python, Flask, Flask-SocketIO, SQLite, HTML, CSS, and browser WebRTC.
-
-## Included features
-
-- User registration and login with hashed passwords
-- Persistent SQLite accounts, servers, memberships, channels, messages, and direct messages
-- Create multiple servers and switch between them
-- Invite people to servers with a shareable invite link or invite code
-- Create text and voice channels
-- Real-time server text chat
-- Add friends by username, accept incoming friend requests, and open one-to-one DMs
-- Real-time private messaging with message history
-- Start voice calls in voice channels and one-to-one DMs
-- Microphone mute/unmute, deafen/undeafen, and leave-call controls
-- Member list, online status, profile bio, and avatar upload
-- Discord-inspired dark layout with responsive sidebars and friends view
+HOSTIST is a Discord-inspired, self-hosted community chat starter made with Python, Flask, Flask-SocketIO, SQLite, HTML, CSS, and browser WebRTC.
 
 ## Run locally
 
@@ -49,20 +34,43 @@ HOSTIST is a Discord-inspired community chat app built with Python, Flask, Flask
    python app.py
    ```
 
-6. Visit http://127.0.0.1:5000 and create an account. Create a second account in another browser/incognito window to test friend requests, DMs, and voice calls.
+6. Visit http://127.0.0.1:5000 and create an account.
 
-## Deploy on Render
+## Features in this build
 
-The included `render.yaml` uses a persistent disk for the SQLite database and uploaded avatars. Push the contents of this folder to a GitHub repository, then create a Render Blueprint from that repository. Keep the persistent disk attached and use one service instance for this SQLite/in-memory voice-presence build.
-
-The app reads `ABYSS_SECRET` and `ABYSS_DATA_DIR` from the environment; `render.yaml` configures both.
+- User registration and login with hashed passwords
+- Persistent SQLite storage
+- Create servers and text/voice channels
+- Invite codes to join servers
+- Real-time text chat
+- Friend requests and one-to-one direct messages
+- Profile bio and avatar upload
+- Online/offline status indicator
+- Home button opens the Friends and Direct Messages workspace (Discord-style)
+- Separate Servers navigation rail
+- Bottom user menu with remembered account names and password-required account switching
+- Basic server roles (owner/member)
+- Browser voice chat prototype using WebRTC peer connections
 
 ## Voice chat notes
 
-Voice uses browser microphone access and peer-to-peer WebRTC with public Google STUN servers. Users must grant microphone permission, and the site must run on HTTPS (or localhost). The in-app controls support mute, deafen, and leave. Voice signaling and room membership are handled by Flask-SocketIO.
+Voice uses browser microphone access and WebRTC with a public STUN server. It works best on `localhost` or an HTTPS deployment, and users must grant microphone permission. Some NAT/firewall combinations require a TURN server, which is not bundled. The current voice implementation is a basic peer-to-peer mesh prototype, not Discord-grade voice infrastructure.
 
-This is a small-community starter, not a production-grade voice service. Some networks require a TURN relay for reliable calls; no TURN service or credentials are included. The current peer-to-peer mesh is best for small rooms. For larger public rooms, use a dedicated SFU such as LiveKit, mediasoup, or Janus and configure a managed TURN service.
+## Important security and production limitations
 
-## Before public launch
+This is a functional starter, not a production-ready Discord replacement. Before exposing it publicly:
+- Set a strong random `HOSTIST_SECRET` environment variable.
+- Run behind HTTPS and a production server configured for Flask-SocketIO.
+- Add CSRF protection, rate limiting, email verification, password reset, moderation/reporting, server ownership transfer, richer role/permission controls, and abuse prevention.
+- Configure secure upload scanning and limits.
+- Use a TURN service for reliable voice connectivity.
+- Add proper presence tracking across multiple browser sessions and a persistent Socket.IO deployment adapter for multiple app workers.
 
-This project still needs production hardening: CSRF protection, rate limiting, email verification, password reset, moderation/reporting, richer roles and permissions, upload scanning, backups, and a managed database/storage service for horizontal scaling. Voice presence is held in process memory, so run one app instance unless you add a shared presence store and Socket.IO message queue. Keep dependencies updated and set a strong secret in the hosting environment.
+The app is intended for local development and small private communities.
+
+
+## Interface refresh
+The Friends workspace now follows a Discord-inspired black layout with a conversation search,
+Friends and Message Requests navigation, a separate DM list, an Active Now panel, and a
+profile popover opened from the signed-in user control at the bottom of the sidebar.
+The Servers workspace remains separate in the left server rail.
