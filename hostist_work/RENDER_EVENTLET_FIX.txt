@@ -1,0 +1,12 @@
+HOSTIST Render startup fix
+
+This project uses Flask-SocketIO async_mode="threading". Do not use Eventlet.
+
+In Render Dashboard > your service > Settings, set Start Command to:
+ gunicorn --worker-class gthread --threads 20 --bind 0.0.0.0:$PORT app:app
+
+Ensure no startup file calls eventlet.monkey_patch(), and do not use:
+ gunicorn --worker-class eventlet ...
+
+The supplied requirements.txt intentionally does not include eventlet, gevent, or gevent-websocket.
+After changing the command, trigger a Clear build cache & deploy.
