@@ -414,3 +414,16 @@ body.layout,.layout,.conversation{background:#000;color:#f3f3f3}
 .public-profile-member-section{border-top:1px solid #222;padding-top:14px;margin-top:3px}
 .public-profile-member-section p{margin:0;color:#ddd;font-size:12px}
 .profile-popover-cover{background:#000!important}
+
+
+/* Profile identity consistency: pronouns stay beside the handle; bio sits below. */
+.profile-popover-user{cursor:pointer;}
+.profile-popover-user .user-avatar img,.user-bar .user-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;}
+.profile-popover-identity{display:flex;flex-direction:column;gap:4px;min-width:0;padding-top:17px;}
+.profile-popover-handle-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.profile-popover-handle-row small{font-size:10px;color:#a2a5af;}
+.profile-popover-handle-row .profile-popover-pronouns{display:inline;color:#999!important;margin:0;padding:0;}
+.profile-popover-bio{display:block;padding:8px 13px 12px;line-height:1.45;overflow-wrap:anywhere;}
+.user-label small{display:block;max-width:155px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.profile-open[role="button"],.profile-open.friend-card-name{cursor:pointer;}
+.profile-open:focus-visible{outline:2px solid #aaa;outline-offset:2px;border-radius:5px;}

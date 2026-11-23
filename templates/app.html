@@ -30,7 +30,7 @@
     <div class="friend-shortcuts"><span>DIRECT MESSAGES</span><button type="button" onclick="document.getElementById('add-friend').showModal()" title="Start a DM">＋</button></div>
     {% for d in dms %}
       <a class="dm-row searchable {{'active' if dm_id==d.id else ''}}" data-search="{{d.username|lower}}" href="{{url_for('app_home',dm=d.id,view='friends')}}">
-        <span class="mini-avatar">{{(d.username or '?')[:1]|upper}}</span><span class="dm-name">{{d.username or 'Direct message'}}</span>
+        <span class="mini-avatar profile-open" data-user-id="{{d.id}}">{{(d.username or '?')[:1]|upper}}</span><span class="dm-name profile-open" data-user-id="{{d.id}}">{{d.username or 'Direct message'}}</span>
       </a>
     {% else %}
       <p class="empty-side">Your direct messages will appear here.</p>
@@ -53,8 +53,11 @@
 {% endif %}
 <div class="account-menu" id="account-menu" hidden>
   <div class="profile-popover-cover"></div>
-  <div class="profile-popover-user"><span class="user-avatar">{{(own_profile.display_name or username)[:1]|upper}}</span><div><b>{{own_profile.display_name or username}}</b><small>@{{username}}</small></div></div>
-  <div class="profile-popover-bio">{{own_profile.bio or 'Welcome to HOSTIST.'}}{% if own_profile.pronouns %}<small class="profile-pronouns">{{own_profile.pronouns}}</small>{% endif %}</div>
+  <div class="profile-popover-user profile-open" data-user-id="{{own_profile.id}}" role="button" tabindex="0" aria-label="View your profile">
+    <span class="user-avatar">{% if own_profile.avatar %}<img src="{{url_for('uploaded_file',filename=own_profile.avatar)}}" alt="">{% else %}{{(own_profile.display_name or username)[:1]|upper}}{% endif %}</span>
+    <div class="profile-popover-identity"><b>{{own_profile.display_name or username}}</b><div class="profile-popover-handle-row"><small>@{{username}}</small>{% if own_profile.pronouns %}<small class="profile-popover-pronouns">{{own_profile.pronouns}}</small>{% endif %}</div></div>
+  </div>
+  <div class="profile-popover-bio">{{own_profile.bio or 'Welcome to HOSTIST.'}}</div>
   <div class="account-menu-heading">ACCOUNT</div>
   <button class="account-menu-item" type="button" onclick="openPublicProfile({{own_profile.id}});document.getElementById('account-menu').hidden=true">◎ <span>View my profile</span></button>
   <button class="account-menu-item" type="button" onclick="showSavedAccounts()">⇄ <span>Switch account</span><span class="menu-chevron">›</span></button>
@@ -64,7 +67,7 @@
 </div>
 <footer class="user-bar">
   <button class="account-trigger" type="button" onclick="toggleAccountMenu()" aria-haspopup="true" aria-expanded="false" id="account-trigger">
-    <span class="user-avatar">{{(own_profile.display_name or username)[:1]|upper}}</span><span class="user-label"><b>{{own_profile.display_name or username}}</b><small>@{{username}}</small></span><span class="account-chevron">⌃</span>
+    <span class="user-avatar">{% if own_profile.avatar %}<img src="{{url_for('uploaded_file',filename=own_profile.avatar)}}" alt="">{% else %}{{(own_profile.display_name or username)[:1]|upper}}{% endif %}</span><span class="user-label"><b>{{own_profile.display_name or username}}</b><small>@{{username}}{% if own_profile.pronouns %} · {{own_profile.pronouns}}{% endif %}</small></span><span class="account-chevron">⌃</span>
   </button>
   <button class="profile-settings" title="Settings" aria-label="Settings" onclick="openProfileSettings('account')">⚙</button>
 </footer>
@@ -72,7 +75,7 @@
 
 <main class="conversation">
 {% if dm_id and active_dm %}
-  <header class="chat-top"><span class="mini-avatar">{{active_dm.username[:1]|upper}}</span><div class="chat-heading"><b>{{active_dm.username}}</b><small><i class="presence {{active_dm.status}}"></i> {{active_dm.status|title}}</small></div><span class="topic">Direct message</span><button class="call-action" onclick="startDmCall({{dm_id}},{{active_dm.username|tojson}})" title="Start voice call">☎ <span>Call</span></button></header>
+  <header class="chat-top"><button type="button" class="mini-avatar profile-open" data-user-id="{{active_dm.id}}" aria-label="View {{active_dm.username}} profile">{{active_dm.username[:1]|upper}}</button><div class="chat-heading profile-open" data-user-id="{{active_dm.id}}" role="button" tabindex="0"><b>{{active_dm.username}}</b><small><i class="presence {{active_dm.status}}"></i> {{active_dm.status|title}}</small></div><span class="topic">Direct message</span><button class="call-action" onclick="startDmCall({{dm_id}},{{active_dm.username|tojson}})" title="Start voice call">☎ <span>Call</span></button></header>
   <section class="chat-feed" id="feed"><div class="intro"><div class="intro-symbol">✉</div><h2>{{active_dm.username}}</h2><p>This is the beginning of your direct message history.</p></div>
   {% for m in dm_history %}<article class="message"><div class="msg-avatar">{{m.username[:1]|upper}}</div><div><div class="msg-head"><b>{{m.username}}</b><time>{{m.created_at}}</time></div><p>{{m.content}}</p></div></article>{% endfor %}</section>
   <form class="message-box" id="dm-form"><span>＋</span><input id="dm-input" placeholder="Message @{{active_dm.username}}" maxlength="2000" autocomplete="off"><button>➤</button></form>
@@ -80,7 +83,7 @@
   <header class="chat-top friends-toolbar"><span class="friends-toolbar-title">♟ <b>Friends</b></span><span class="toolbar-dot">•</span><a class="friends-tab active" href="{{url_for('app_home',view='friends')}}">All</a><button class="discord-add" onclick="document.getElementById('add-friend').showModal()">Add Friend</button></header>
   <section class="friends-content"><div class="friends-main">
     <div class="friends-empty-state">{% if friends %}<h2>All Friends · {{friends|length}}</h2><div class="friends-grid">{% for f in friends %}<form class="friend-card" method="post" action="{{url_for('open_dm',other_id=f.id)}}"><button type="button" class="mini-avatar profile-open" data-user-id="{{f.id}}" aria-label="View {{f.username}} profile">{{f.username[:1]|upper}}</button><span class="friend-card-name profile-open" data-user-id="{{f.id}}"><b>{{f.username}}</b><small><i class="presence {{f.status}}"></i>{{f.status|title}}</small></span><button class="gray-btn">Message</button></form>{% endfor %}</div>{% else %}<div class="empty-friends-icon">♟</div><p>There are no friends online at this time. Check back later!</p>{% endif %}</div>
-  </div><aside class="active-now"><h3>Active Now</h3>{% set online_friends = friends|selectattr('status','equalto','online')|list %}{% if online_friends %}{% for f in online_friends %}<form method="post" action="{{url_for('open_dm',other_id=f.id)}}" class="active-friend"><span class="mini-avatar">{{f.username[:1]|upper}}</span><span><b>{{f.username}}</b><small>Online</small></span><button aria-label="Message {{f.username}}">✉</button></form>{% endfor %}{% else %}<div class="active-empty"><b>It's quiet for now...</b><p>When a friend starts an activity, we'll show it here.</p></div>{% endif %}</aside></section>
+  </div><aside class="active-now"><h3>Active Now</h3>{% set online_friends = friends|selectattr('status','equalto','online')|list %}{% if online_friends %}{% for f in online_friends %}<form method="post" action="{{url_for('open_dm',other_id=f.id)}}" class="active-friend"><span class="mini-avatar profile-open" data-user-id="{{f.id}}">{{f.username[:1]|upper}}</span><span class="profile-open" data-user-id="{{f.id}}" role="button" tabindex="0"><b>{{f.username}}</b><small>Online</small></span><button aria-label="Message {{f.username}}">✉</button></form>{% endfor %}{% else %}<div class="active-empty"><b>It's quiet for now...</b><p>When a friend starts an activity, we'll show it here.</p></div>{% endif %}</aside></section>
 {% elif view=='servers' and not server_id %}
   <header class="chat-top"><b>Servers</b></header><section class="server-empty-stage"><h2>No servers yet</h2><p>Create your own server or join one using an invite code.</p><button class="white-btn" onclick="document.getElementById('create-server').showModal()">＋ Create a server</button><button class="gray-btn" onclick="document.getElementById('join-server').showModal()">Join a server</button></section>
 {% elif channel and channel.kind=='text' %}
@@ -187,8 +190,35 @@ socket.on('voice_joined',d=>{if(d&&d.name){voiceLabel=(d.kind==='dm'?'DM call ·
 socket.on('voice_peer_left',d=>closePeer(d.sid));
 window.addEventListener('beforeunload',()=>{if(voiceRoom)socket.emit('voice_leave')});
 const search=document.getElementById('friend-search');if(search)search.addEventListener('input',()=>{const q=search.value.toLowerCase();document.querySelectorAll('.searchable').forEach(el=>el.style.display=el.dataset.search.includes(q)?'':'none')});
-async function openPublicProfile(id){const dialog=document.getElementById('public-profile-modal');try{const response=await fetch(`/api/users/${id}/profile`);if(!response.ok)throw new Error('Profile unavailable');const u=await response.json();const avatar=document.getElementById('public-profile-avatar');avatar.innerHTML='';if(u.avatar){const img=document.createElement('img');img.src=u.avatar;img.alt=(u.display_name||u.username)+' profile picture';avatar.append(img)}else avatar.textContent=(u.display_name||u.username||'?').slice(0,1).toUpperCase();document.getElementById('public-profile-name').textContent=u.display_name||u.username;document.getElementById('public-profile-handle').textContent='@'+u.username;document.getElementById('public-profile-pronouns').textContent=u.pronouns||'';document.getElementById('public-profile-presence').className='public-profile-presence '+(u.status==='online'?'is-online':'is-offline');document.getElementById('public-profile-bio').textContent=u.bio||'No bio yet.';document.getElementById('public-profile-meta').textContent=new Date(u.created_at.replace(' ','T')+'Z').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});const actions=document.getElementById('public-profile-actions');actions.innerHTML='';if(!u.is_self){const msg=document.createElement('form');msg.method='post';msg.action=`/dms/open/${u.id}`;const mb=document.createElement('button');mb.className='profile-message-btn';mb.textContent='Message';msg.append(mb);actions.append(msg);if(u.friend_status==='accepted'){const label=document.createElement('span');label.className='profile-friend-state';label.textContent='✓ Friends';actions.append(label)}else if(u.friend_status==='pending'&&!u.friend_request_incoming){const label=document.createElement('span');label.className='profile-friend-state';label.textContent='Request sent';actions.append(label)}else{const f=document.createElement('form');f.method='post';f.action='/friends/request';const hidden=document.createElement('input');hidden.type='hidden';hidden.name='username';hidden.value=u.username;const b=document.createElement('button');b.className='profile-add-btn';b.textContent=u.friend_request_incoming?'Accept friend request':'Add friend';f.append(hidden,b);actions.append(f)}}else{const own=document.createElement('button');own.className='profile-message-btn';own.textContent='Edit Profile';own.onclick=()=>{dialog.close();openProfileSettings('profile')};actions.append(own)}dialog.showModal()}catch(e){toast('Could not load this profile.')}}
-document.addEventListener('click',e=>{const target=e.target.closest('.profile-open');if(target)openPublicProfile(target.dataset.userId)});document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('profile-open')){e.preventDefault();openPublicProfile(e.target.dataset.userId)}});
+async function openPublicProfile(id){
+  const dialog=document.getElementById('public-profile-modal');
+  if(!id || !/^\d+$/.test(String(id))){toast('This profile link is missing a user ID.');return}
+  try{
+    const response=await fetch(`/api/users/${encodeURIComponent(id)}/profile`,{credentials:'same-origin',headers:{'Accept':'application/json'}});
+    if(!response.ok) throw new Error(`Profile request failed (${response.status})`);
+    const u=await response.json();
+    if(!u || !u.id || !u.username) throw new Error('The profile response was incomplete.');
+    const avatar=document.getElementById('public-profile-avatar');avatar.replaceChildren();
+    if(u.avatar){const img=document.createElement('img');img.src=u.avatar;img.alt=(u.display_name||u.username)+' profile picture';avatar.append(img)}else avatar.textContent=(u.display_name||u.username||'?').slice(0,1).toUpperCase();
+    document.getElementById('public-profile-name').textContent=u.display_name||u.username;
+    document.getElementById('public-profile-handle').textContent='@'+u.username;
+    document.getElementById('public-profile-pronouns').textContent=u.pronouns||'';
+    document.getElementById('public-profile-presence').className='public-profile-presence '+(u.status==='online'?'is-online':'is-offline');
+    document.getElementById('public-profile-bio').textContent=u.bio||'No bio yet.';
+    const created=u.created_at?new Date(String(u.created_at).replace(' ','T')+'Z'):null;
+    document.getElementById('public-profile-meta').textContent=created&&!Number.isNaN(created.getTime())?created.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'—';
+    const actions=document.getElementById('public-profile-actions');actions.replaceChildren();
+    if(!u.is_self){
+      const msg=document.createElement('form');msg.method='post';msg.action=`/dms/open/${u.id}`;const mb=document.createElement('button');mb.className='profile-message-btn';mb.textContent='Message';msg.append(mb);actions.append(msg);
+      if(u.friend_status==='accepted'){const label=document.createElement('span');label.className='profile-friend-state';label.textContent='✓ Friends';actions.append(label)}
+      else if(u.friend_status==='pending'&&!u.friend_request_incoming){const label=document.createElement('span');label.className='profile-friend-state';label.textContent='Request sent';actions.append(label)}
+      else{const f=document.createElement('form');f.method='post';f.action='/friends/request';const hidden=document.createElement('input');hidden.type='hidden';hidden.name='username';hidden.value=u.username;const b=document.createElement('button');b.className='profile-add-btn';b.textContent=u.friend_request_incoming?'Accept friend request':'Add friend';f.append(hidden,b);actions.append(f)}
+    }else{const own=document.createElement('button');own.className='profile-message-btn';own.textContent='Edit Profile';own.onclick=()=>{dialog.close();openProfileSettings('profile')};actions.append(own)}
+    if(!dialog.open)dialog.showModal();
+  }catch(e){console.error('Unable to load HOSTIST profile:',e);toast('Could not load this profile. Please try again.')}
+}
+document.addEventListener('click',e=>{const target=e.target.closest('.profile-open');if(target){e.preventDefault();e.stopPropagation();openPublicProfile(target.dataset.userId)}});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.closest('.profile-open')){e.preventDefault();openPublicProfile(e.target.closest('.profile-open').dataset.userId)}});
 
 </script>
 </body></html>
