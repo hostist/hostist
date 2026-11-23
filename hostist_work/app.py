@@ -1,7 +1,7 @@
 import os, re, sqlite3, secrets
 from datetime import datetime, timedelta, date
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, abort, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, abort, send_from_directory, has_request_context
 from flask_socketio import SocketIO, join_room, leave_room, emit
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -634,12 +634,21 @@ def voice_signal(data):
 
 @socketio.on("disconnect")
 def ws_disconnect():
-    cid = active_voice_sessions.pop(request.sid, None)
+    # Socket.IO normally supplies a request context to event handlers. During
+    # worker shutdown or an interrupted transport, however, the context may
+    # already be gone. Avoid dereferencing Werkzeug LocalProxy objects then.
+    if not has_request_context():
+        return
+
+    sid = request.sid
+    cid = active_voice_sessions.pop(sid, None)
     if cid is not None:
-        emit("voice_peer_left", {"sid": request.sid}, room=cid)
-    if logged_in():
+        emit("voice_peer_left", {"sid": sid}, room=cid)
+
+    uid = session.get("uid")
+    if uid is not None:
         with connect() as c:
-            c.execute("UPDATE users SET status='offline' WHERE id=?", (session["uid"],))
+            c.execute("UPDATE users SET status='offline' WHERE id=?", (uid,))
     # Socket.IO removes the socket from rooms automatically.
 
 @app.errorhandler(403)
