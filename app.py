@@ -1,7 +1,7 @@
 import os, re, sqlite3, secrets
 from datetime import datetime, timedelta, date
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, abort
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, abort, send_from_directory, has_request_context
 from flask_socketio import SocketIO, join_room, leave_room, emit
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -96,6 +96,8 @@ def init_db():
             c.execute("ALTER TABLE users ADD COLUMN display_name TEXT DEFAULT ''")
         if "date_of_birth" not in columns:
             c.execute("ALTER TABLE users ADD COLUMN date_of_birth TEXT")
+        if "pronouns" not in columns:
+            c.execute("ALTER TABLE users ADD COLUMN pronouns TEXT DEFAULT ''")
         # Enforce case-insensitive username and email uniqueness.
         try:
             c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_nocase ON users(username COLLATE NOCASE)")
@@ -237,6 +239,22 @@ def logout():
     session.clear()
     return redirect(url_for("login"))
 
+@app.get("/uploads/<path:filename>")
+def uploaded_file(filename):
+    return send_from_directory(UPLOAD_DIR, filename)
+
+@app.get("/api/users/<int:user_id>/profile")
+@require_auth
+def public_profile(user_id):
+    uid = session["uid"]
+    with connect() as c:
+        user = c.execute("SELECT id,username,display_name,pronouns,avatar,bio,status,created_at FROM users WHERE id=?", (user_id,)).fetchone()
+        if not user:
+            abort(404)
+        relation = c.execute("SELECT requester_id,addressee_id,status FROM friendships WHERE (requester_id=? AND addressee_id=?) OR (requester_id=? AND addressee_id=?)", (uid,user_id,user_id,uid)).fetchone() if uid != user_id else None
+        mutual_servers = c.execute("SELECT COUNT(*) FROM memberships mine JOIN memberships theirs ON theirs.server_id=mine.server_id WHERE mine.user_id=? AND theirs.user_id=?", (uid,user_id)).fetchone()[0]
+        return jsonify({"id": user["id"], "username": user["username"], "display_name": user["display_name"] or user["username"], "pronouns": user["pronouns"] or "", "avatar": url_for("uploaded_file", filename=user["avatar"]) if user["avatar"] else "", "bio": user["bio"] or "", "status": user["status"] or "offline", "created_at": user["created_at"], "is_self": uid == user_id, "friend_status": relation["status"] if relation else "none", "friend_request_incoming": bool(relation and relation["requester_id"] == user_id and relation["status"] == "pending"), "mutual_servers": mutual_servers})
+
 @app.route("/app")
 @require_auth
 def app_home():
@@ -306,8 +324,10 @@ def app_home():
                                           WHERE m.conversation_id=? ORDER BY m.id DESC LIMIT 60""", (dm_id,)).fetchall()
                 dm_history = list(reversed(dm_history))
 
+    with connect() as c:
+        own_profile = c.execute("SELECT username,display_name,bio,pronouns,avatar FROM users WHERE id=?", (uid,)).fetchone()
     return render_template("app.html", servers=servers, channels=channels, server_id=sid, channel=channel,
-                           members=members, history=history, username=session["username"], friends=friends,
+                           members=members, history=history, username=session["username"], own_profile=own_profile, friends=friends,
                            pending=pending, dms=dms, dm_id=dm_id, active_dm=active_dm,
                            dm_history=dm_history, view=view)
 
@@ -442,19 +462,36 @@ def create_group_dm():
 @app.post("/profile")
 @require_auth
 def profile():
-    bio=request.form.get("bio","").strip()[:160]
-    avatar=session.get("avatar","")
+    bio=request.form.get("bio", "").strip()[:160]
+    display_name=request.form.get("display_name", "").strip()[:32]
+    username=request.form.get("username", "").strip()
+    pronouns=request.form.get("pronouns", "").strip()[:30]
+    if not display_name:
+        display_name = username
+    if len(display_name) > 32:
+        flash("Display name must be 32 characters or fewer.")
+        return redirect(url_for("app_home"))
+    if not re.fullmatch(r"[A-Za-z0-9_]{3,20}", username):
+        flash("Username must be 3–20 characters using letters, numbers, or underscores.")
+        return redirect(url_for("app_home"))
+    avatar=session.get("avatar", "")
     file=request.files.get("avatar")
     if file and file.filename:
         ext=os.path.splitext(secure_filename(file.filename))[1].lower()
-        if ext not in (".png",".jpg",".jpeg",".gif",".webp"): 
+        if ext not in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
             flash("Avatar must be PNG, JPG, GIF, or WEBP.")
             return redirect(url_for("app_home"))
         filename=f"user_{session['uid']}_{secrets.token_hex(5)}{ext}"
-        file.save(os.path.join(UPLOAD_DIR,filename))
+        file.save(os.path.join(UPLOAD_DIR, filename))
         avatar=filename
     with connect() as c:
-        c.execute("UPDATE users SET bio=?,avatar=? WHERE id=?",(bio,avatar,session["uid"]))
+        taken=c.execute("SELECT id FROM users WHERE username=? COLLATE NOCASE AND id<>?", (username, session["uid"])).fetchone()
+        if taken:
+            flash("That username is already taken. Choose another one.")
+            return redirect(url_for("app_home"))
+        c.execute("UPDATE users SET username=?,display_name=?,pronouns=?,bio=?,avatar=? WHERE id=?",
+                  (username, display_name, pronouns, bio, avatar, session["uid"]))
+    session["username"] = username
     flash("Profile updated.")
     return redirect(url_for("app_home"))
 
@@ -597,12 +634,21 @@ def voice_signal(data):
 
 @socketio.on("disconnect")
 def ws_disconnect():
-    cid = active_voice_sessions.pop(request.sid, None)
+    # Socket.IO normally supplies a request context to event handlers. During
+    # worker shutdown or an interrupted transport, however, the context may
+    # already be gone. Avoid dereferencing Werkzeug LocalProxy objects then.
+    if not has_request_context():
+        return
+
+    sid = request.sid
+    cid = active_voice_sessions.pop(sid, None)
     if cid is not None:
-        emit("voice_peer_left", {"sid": request.sid}, room=cid)
-    if logged_in():
+        emit("voice_peer_left", {"sid": sid}, room=cid)
+
+    uid = session.get("uid")
+    if uid is not None:
         with connect() as c:
-            c.execute("UPDATE users SET status='offline' WHERE id=?", (session["uid"],))
+            c.execute("UPDATE users SET status='offline' WHERE id=?", (uid,))
     # Socket.IO removes the socket from rooms automatically.
 
 @app.errorhandler(403)

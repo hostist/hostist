@@ -286,3 +286,106 @@ body.layout,.layout,.conversation{background:#000;color:#f3f3f3}
 .signup-card .auth-switch{font-size:13px;margin:22px 0 0;color:#b7b8be}
 .signup-card .flash{margin:0 0 12px}
 @media(max-width:520px){.register-page.auth-bg{align-items:start;padding-top:30px}.register-page .auth-wrap{width:100%}.register-page .signup-card{padding:0}.birth-fields{gap:7px}}
+
+/* Public member profiles */
+.profile-open{cursor:pointer}.profile-open:hover{filter:brightness(1.18)}.member-item.profile-open:hover{background:#292932;border-radius:7px}.member-item.profile-open:focus-visible,.profile-open:focus-visible{outline:2px solid #b52b36;outline-offset:2px}
+.public-profile-modal{width:min(430px,calc(100vw - 28px));padding:0;border:1px solid #393943;border-radius:14px;background:#202027;color:#f5f4f7;overflow:hidden;box-shadow:0 24px 80px #0009}.public-profile-modal::backdrop{background:#09090dcc;backdrop-filter:blur(4px)}.public-profile-cover{height:112px;background:linear-gradient(125deg,#350b12,#8e1726 55%,#241018)}.profile-close{position:absolute;right:12px;top:10px;border:0;border-radius:50%;width:32px;height:32px;background:#15151bcc;color:#fff;font-size:23px;cursor:pointer}.public-profile-body{padding:0 22px 22px}.public-profile-avatar{width:82px;height:82px;margin-top:-42px;border:6px solid #202027;border-radius:50%;background:#8d1d2b;display:grid;place-items:center;font-size:30px;font-weight:800;overflow:hidden}.public-profile-avatar img{width:100%;height:100%;object-fit:cover}.public-profile-title h2{margin:9px 0 2px;font-size:22px}.public-profile-title span{color:#a5a3ad;font-size:12px}.public-profile-status{margin-top:13px;color:#aaa8b2;font-size:12px}.public-profile-bio{min-height:42px;margin:15px 0;color:#e0dee5;font-size:13px;line-height:1.55;overflow-wrap:anywhere}.public-profile-meta{padding:12px 0;border-top:1px solid #383841;color:#9997a2;font-size:11px}.public-profile-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.public-profile-actions form{margin:0}.profile-message-btn,.profile-add-btn{border:0;border-radius:7px;padding:9px 15px;background:#a51e2d;color:white;font-weight:700;cursor:pointer}.profile-add-btn{background:#393943}.profile-friend-state{color:#8bd5a1;font-size:12px;font-weight:700}
+
+/* Profile settings */
+.profile-settings-modal{width:min(480px,calc(100vw - 28px));max-height:calc(100vh - 36px);overflow-y:auto;padding:24px;border:1px solid #3b3b45;border-radius:16px;background:#202027;color:#f5f4f7;box-shadow:0 24px 80px #000b}
+.profile-settings-modal::backdrop{background:#08080dcc;backdrop-filter:blur(4px)}
+.profile-settings-modal form{display:flex;flex-direction:column;gap:9px}
+.profile-settings-modal .settings-modal-heading{position:relative;margin-bottom:12px;padding-right:34px}
+.settings-eyebrow{font-size:10px;letter-spacing:1.5px;font-weight:800;color:#d36a76}
+.settings-modal-heading h2{font-size:22px;margin:6px 0 4px;color:#fff}
+.settings-modal-heading p,.settings-hint{font-size:12px;color:#a5a4af;margin:0;line-height:1.5}
+.profile-settings-modal .profile-close{top:0;right:0}
+.profile-settings-modal label{margin-top:8px;font-size:10px;letter-spacing:1px;font-weight:800;color:#c5c4ce}
+.profile-settings-modal input:not([type=file]),.profile-settings-modal textarea{width:100%;box-sizing:border-box;border:1px solid #41414c;border-radius:8px;background:#17171d;color:#f5f4f7;padding:11px 12px;font:inherit;font-size:13px;outline:none}
+.profile-settings-modal input:focus,.profile-settings-modal textarea:focus{border-color:#b52b3b;box-shadow:0 0 0 2px #b52b3b2b}
+.profile-settings-modal textarea{min-height:92px;resize:vertical}
+.profile-settings-modal input[type=file]{font-size:12px;color:#aaa9b4;padding:5px 0}
+.username-field{display:flex;align-items:center;border:1px solid #41414c;border-radius:8px;background:#17171d;padding-left:12px;color:#aaa9b4}
+.username-field:focus-within{border-color:#b52b3b;box-shadow:0 0 0 2px #b52b3b2b}
+.username-field input:not([type=file]){border:0;box-shadow:none!important;background:transparent;padding-left:7px}
+.profile-settings-modal .settings-hint{margin-top:2px}
+.profile-settings-modal .modal-buttons{display:flex;justify-content:flex-end;gap:9px;margin-top:13px}
+.profile-pronouns{display:block;color:#9696a2;font-size:10px;margin-top:4px}
+
+/* Discord-inspired account settings */
+.account-settings-dialog{width:min(980px,calc(100vw - 34px));height:min(720px,calc(100vh - 34px));max-width:none;max-height:none;padding:0;border:1px solid #353640;border-radius:12px;background:#303136;color:#f2f3f5;overflow:hidden;box-shadow:0 28px 100px #000b}
+.account-settings-dialog::backdrop{background:#111214d9}.account-settings-dialog>form{height:100%;display:grid;grid-template-columns:218px minmax(0,1fr);gap:0}
+.settings-sidebar{background:#242529;padding:28px 12px 18px 18px;display:flex;flex-direction:column;gap:5px}.settings-sidebar-title{padding:0 10px 13px;color:#a5a6ad;font-size:10px;font-weight:800;letter-spacing:1.15px}
+.settings-nav{border:0;border-radius:5px;background:transparent;color:#b5b6bd;text-align:left;padding:11px 12px;font:600 13px inherit;cursor:pointer;display:flex;align-items:center;gap:11px}.settings-nav span{width:17px;text-align:center;font-size:16px}.settings-nav:hover{background:#303136;color:#f2f3f5}.settings-nav.active{background:#3d3f46;color:#fff}
+.settings-sidebar-bottom{margin-top:auto;padding:14px 10px 0;border-top:1px solid #38393f;display:flex;flex-direction:column;gap:4px;color:#8e9098;font-size:10px;letter-spacing:1px;font-weight:800}.settings-sidebar-bottom small{font-size:11px;letter-spacing:0;font-weight:400;color:#777982}
+.settings-main{position:relative;min-width:0;display:flex;flex-direction:column;background:#303136}.settings-close{position:absolute;z-index:2;right:22px;top:20px;width:34px;height:34px;border:2px solid #777982;border-radius:50%;background:transparent;color:#c8c9ce;font-size:25px;line-height:1;cursor:pointer}.settings-close:hover{background:#42444b;color:white}
+.settings-content{overflow-y:auto;flex:1;padding:38px clamp(22px,5vw,64px) 30px}.settings-page-heading{margin:0 0 26px}.settings-page-heading>span{font-size:10px;letter-spacing:1.2px;font-weight:800;color:#b5b6bd}.settings-page-heading h1{font-size:25px;line-height:1.2;margin:7px 0;color:#fff}.settings-page-heading p,.settings-section-heading p{font-size:12px;color:#b5b6bd;margin:0;line-height:1.5}
+.settings-account-card{display:flex;align-items:center;gap:14px;padding:17px;background:#232429;border-radius:9px;margin-bottom:30px}.settings-account-avatar{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#8d1d2b;color:white;font-size:21px;font-weight:800}.settings-account-identity{display:flex;flex-direction:column;gap:4px;min-width:0}.settings-account-identity b{font-size:14px;color:#fff}.settings-account-identity span{font-size:12px;color:#b5b6bd}.settings-account-tag{margin-left:auto;color:#b5b6bd;font-size:9px;font-weight:800;letter-spacing:.8px}
+.settings-section-heading{margin:24px 0 13px}.settings-section-heading h2{font-size:15px;margin:0 0 5px;color:#fff}.settings-field{display:flex;flex-direction:column;gap:7px;margin:17px 0}.settings-field>span,.settings-avatar-actions>b{font-size:10px;letter-spacing:.8px;font-weight:800;color:#d1d2d7}.settings-field input,.settings-field textarea,.settings-input-prefix{box-sizing:border-box;width:100%;border:1px solid #1d1e22;border-radius:5px;background:#1e1f22;color:#f2f3f5;padding:11px 12px;font:13px inherit;outline:none}.settings-field input:focus,.settings-field textarea:focus,.settings-input-prefix:focus-within{border-color:#8795ff}.settings-field textarea{resize:vertical;min-height:96px}.settings-field small{font-size:10px;color:#a5a6ad;line-height:1.4}
+.settings-input-prefix{display:flex;align-items:center;gap:8px}.settings-input-prefix>span{color:#a5a6ad}.settings-input-prefix input{padding:0;border:0;background:transparent;outline:0}.settings-avatar-editor{display:flex;align-items:center;gap:18px;padding:17px;background:#232429;border-radius:8px}.settings-avatar-preview{width:82px;height:82px;flex:0 0 82px;border-radius:50%;overflow:hidden;background:#8d1d2b;display:grid;place-items:center;color:#fff;font-size:32px;font-weight:800}.settings-avatar-preview img{width:100%;height:100%;object-fit:cover}.settings-avatar-actions{display:flex;align-items:flex-start;flex-direction:column;gap:7px}.settings-avatar-actions span{font-size:11px;color:#a5a6ad}.settings-upload-button{display:inline-flex;margin-top:3px;padding:8px 12px;border-radius:4px;background:#5865f2;color:white;font-size:11px;font-weight:700;cursor:pointer}.settings-upload-button:hover{background:#4752c4}#settings-avatar-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.settings-char-count{text-align:right}
+.settings-footer{min-height:68px;box-sizing:border-box;padding:12px clamp(22px,5vw,64px);background:#292a2f;border-top:1px solid #202126;display:flex;align-items:center;justify-content:space-between;gap:14px}.settings-footer>span{font-size:10px;color:#a5a6ad}.settings-footer>div{display:flex;align-items:center;gap:9px}.settings-cancel,.settings-save{border:0;border-radius:4px;padding:9px 14px;font-size:11px;font-weight:700;cursor:pointer}.settings-cancel{background:transparent;color:#f2f3f5}.settings-cancel:hover{text-decoration:underline}.settings-save{background:#5865f2;color:#fff}.settings-save:hover{background:#4752c4}.settings-pane{display:none}.settings-pane.active{display:block}
+@media(max-width:650px){.account-settings-dialog{width:calc(100vw - 16px);height:calc(100vh - 16px)}.account-settings-dialog>form{grid-template-columns:128px minmax(0,1fr)}.settings-sidebar{padding:24px 7px 12px}.settings-nav{padding:10px 7px;font-size:11px;gap:6px}.settings-content{padding:64px 16px 22px}.settings-close{right:12px;top:12px}.settings-account-tag{display:none}.settings-footer{padding:10px 14px;align-items:flex-end;flex-direction:column}.settings-footer>span{align-self:flex-start}.settings-avatar-preview{width:62px;height:62px;flex-basis:62px}}
+@media(max-width:420px){.account-settings-dialog>form{grid-template-columns:104px minmax(0,1fr)}.settings-sidebar-title{font-size:8px;padding-left:5px}.settings-nav{font-size:10px}.settings-avatar-editor{gap:10px;padding:12px}}
+
+/* Pure-black Discord-inspired settings theme */
+.account-settings-dialog{
+  background:#000000;
+  color:#ffffff;
+  border-color:#242424;
+}
+.account-settings-dialog .settings-sidebar{
+  background:#050505;
+}
+.account-settings-dialog .settings-main{
+  background:#0a0a0a;
+}
+.account-settings-dialog .settings-account-card,
+.account-settings-dialog .settings-avatar-editor{
+  background:#111111;
+}
+.account-settings-dialog .settings-footer{
+  background:#050505;
+  border-top-color:#222222;
+}
+.account-settings-dialog .settings-field input,
+.account-settings-dialog .settings-field textarea,
+.account-settings-dialog .settings-input-prefix{
+  background:#050505;
+  border-color:#292929;
+  color:#ffffff;
+}
+.account-settings-dialog .settings-nav.active{
+  background:#1c1c1c;
+  color:#ffffff;
+}
+.account-settings-dialog .settings-nav:hover{
+  background:#151515;
+  color:#ffffff;
+}
+.account-settings-dialog .settings-sidebar-bottom{
+  border-top-color:#222222;
+}
+.account-settings-dialog .settings-close{
+  border-color:#555555;
+  color:#dddddd;
+}
+.account-settings-dialog .settings-close:hover{
+  background:#1b1b1b;
+}
+.account-settings-dialog .settings-page-heading h1,
+.account-settings-dialog .settings-section-heading h2,
+.account-settings-dialog .settings-account-identity b{
+  color:#ffffff;
+}
+
+/* White Save Changes button */
+.account-settings-dialog .settings-save,
+.account-settings-dialog .settings-save:hover,
+.account-settings-dialog .settings-save:focus{
+  background:#ffffff;
+  color:#080808;
+  border:1px solid #ffffff;
+}
+.account-settings-dialog .settings-save:hover{
+  background:#e8e8e8;
+}

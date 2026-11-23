@@ -1,0 +1,20 @@
+HOSTIST SETTINGS MENU DEPLOYMENT
+
+This project contains the Discord-style black User Settings modal in:
+- templates/app.html
+- static/style.css
+
+The gear button beside the account area opens the settings modal.
+The modal contains My Account (display name, username) and Profiles
+(profile picture, pronouns, bio).
+
+IMPORTANT:
+1. Replace the existing repository files with the contents of this ZIP.
+2. Keep the repository structure as app.py, templates/, and static/.
+3. Commit and push the changes to the branch connected to Render.
+4. In Render, confirm the correct repository and branch, then use
+   Manual Deploy -> Clear build cache & deploy.
+5. Hard-refresh the browser (Ctrl+Shift+R) after deployment.
+
+If the old small "Your profile" dialog still appears after this deployment,
+Render is serving a different branch, root directory, or app entry point.
