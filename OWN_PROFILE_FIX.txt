@@ -1,0 +1,16 @@
+FIX: VIEW YOUR OWN PROFILE
+
+Cause:
+The app page loaded the signed-in user's profile without selecting the users.id
+column, but the "View my profile" button used own_profile.id to call the profile API.
+That left the ID empty and prevented the profile from opening.
+
+Fix:
+The own_profile query now selects id along with username, display_name, bio,
+pronouns, and avatar.
+
+Deploy:
+1. Replace the existing app.py and the rest of the project with these ZIP contents.
+2. Commit and push to the Render-connected GitHub branch.
+3. Deploy on Render.
+4. Hard-refresh the app (Ctrl+Shift+R).

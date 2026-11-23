@@ -389,3 +389,28 @@ body.layout,.layout,.conversation{background:#000;color:#f3f3f3}
 .account-settings-dialog .settings-save:hover{
   background:#e8e8e8;
 }
+
+/* Profile cards: consistent self and other-user profile view */
+.public-profile-modal{width:min(420px,calc(100vw - 24px));max-height:calc(100vh - 28px);padding:0;border:1px solid #242424;border-radius:12px;background:#090909;color:#f5f5f5;overflow-y:auto;box-shadow:0 26px 90px #000c}
+.public-profile-modal::backdrop{background:#000c;backdrop-filter:blur(3px)}
+.public-profile-cover{height:126px;background:#000;border-bottom:1px solid #202020}
+.public-profile-body{padding:0 22px 24px}
+.public-profile-avatar-wrap{position:relative;width:96px;height:96px;margin-top:-62px;margin-bottom:10px}
+.public-profile-avatar{width:96px;height:96px;margin:0;border:6px solid #090909;border-radius:50%;background:#202020;color:#fff;display:grid;place-items:center;font-size:34px;font-weight:800;overflow:hidden}
+.public-profile-avatar img{width:100%;height:100%;object-fit:cover}
+.public-profile-presence{position:absolute;right:0;bottom:4px;width:19px;height:19px;border:5px solid #090909;border-radius:50%;background:#777}
+.public-profile-presence.is-online{background:#35b86b}
+.public-profile-title h2{font-size:21px;margin:4px 0 3px;color:#fff}
+.public-profile-handle-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.public-profile-title span{color:#d1d1d1;font-size:12px}
+.public-profile-pronouns{color:#999!important}
+.public-profile-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:18px 0 20px}
+.public-profile-actions form{margin:0}
+.public-profile-actions .profile-message-btn{background:#fff;color:#080808;border-radius:7px}
+.public-profile-actions .profile-add-btn{background:#202020;color:#eee;border:1px solid #303030}
+.public-profile-bio-section,.public-profile-member-section{padding:0 0 15px}
+.public-profile-bio-section h3,.public-profile-member-section h3{font-size:11px;color:#999;font-weight:600;margin:0 0 7px}
+.public-profile-bio{min-height:0;margin:0;color:#f0f0f0;font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.public-profile-member-section{border-top:1px solid #222;padding-top:14px;margin-top:3px}
+.public-profile-member-section p{margin:0;color:#ddd;font-size:12px}
+.profile-popover-cover{background:#000!important}

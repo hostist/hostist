@@ -325,7 +325,7 @@ def app_home():
                 dm_history = list(reversed(dm_history))
 
     with connect() as c:
-        own_profile = c.execute("SELECT username,display_name,bio,pronouns,avatar FROM users WHERE id=?", (uid,)).fetchone()
+        own_profile = c.execute("SELECT id,username,display_name,bio,pronouns,avatar FROM users WHERE id=?", (uid,)).fetchone()
     return render_template("app.html", servers=servers, channels=channels, server_id=sid, channel=channel,
                            members=members, history=history, username=session["username"], own_profile=own_profile, friends=friends,
                            pending=pending, dms=dms, dm_id=dm_id, active_dm=active_dm,
